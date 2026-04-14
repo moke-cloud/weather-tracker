@@ -31,6 +31,7 @@ export interface HourlyPoint {
   pressureMsl: number | null
   surfacePressure: number | null
   precipitation: number | null
+  precipitationProbability: number | null
   humidity: number | null
   windSpeed: number | null
 }
@@ -56,6 +57,7 @@ export interface DailyForecast {
   tempMax: number | null
   tempMin: number | null
   precipSum: number | null
+  precipProbMax: number | null
   uvIndexMax: number | null
 }
 

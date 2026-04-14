@@ -23,6 +23,7 @@ const HOURLY_PARAMS = [
   'pressure_msl',
   'surface_pressure',
   'precipitation',
+  'precipitation_probability',
   'relative_humidity_2m',
   'wind_speed_10m',
 ].join(',')
@@ -32,6 +33,7 @@ const DAILY_PARAMS = [
   'temperature_2m_max',
   'temperature_2m_min',
   'precipitation_sum',
+  'precipitation_probability_max',
   'uv_index_max',
 ].join(',')
 
@@ -76,6 +78,7 @@ export async function fetchMultiModelForecast(
     const pMsl = getArray(hourly, `pressure_msl${suffix}`)
     const pSurf = getArray(hourly, `surface_pressure${suffix}`)
     const precip = getArray(hourly, `precipitation${suffix}`)
+    const precipProb = getArray(hourly, `precipitation_probability${suffix}`)
     const humid = getArray(hourly, `relative_humidity_2m${suffix}`)
     const wind = getArray(hourly, `wind_speed_10m${suffix}`)
 
@@ -86,6 +89,7 @@ export async function fetchMultiModelForecast(
       pressureMsl: pMsl[i] ?? null,
       surfacePressure: pSurf[i] ?? null,
       precipitation: precip[i] ?? null,
+      precipitationProbability: precipProb[i] ?? null,
       humidity: humid[i] ?? null,
       windSpeed: wind[i] ?? null,
     }))
@@ -93,14 +97,17 @@ export async function fetchMultiModelForecast(
     return { model: m.label, color: m.color, hourly: points }
   })
 
-  // Parse daily data (use JMA as primary for daily view)
+  // Parse daily data (JMA for weather, ECMWF for precip probability since JMA lacks it)
   const primaryModel = MODELS[0].id
+  const precipProbModel = MODELS[1].id // ECMWF has precip probability
   const dailyForecasts: DailyForecast[] = dailyTimes.map((d, i) => ({
     date: d,
     weatherCode: getArray(daily, `weather_code_${primaryModel}`)[i] ?? null,
     tempMax: getArray(daily, `temperature_2m_max_${primaryModel}`)[i] ?? null,
     tempMin: getArray(daily, `temperature_2m_min_${primaryModel}`)[i] ?? null,
     precipSum: getArray(daily, `precipitation_sum_${primaryModel}`)[i] ?? null,
+    precipProbMax: getArray(daily, `precipitation_probability_max_${precipProbModel}`)[i]
+      ?? getArray(daily, `precipitation_probability_max_${MODELS[2].id}`)[i] ?? null,
     uvIndexMax: getArray(daily, `uv_index_max_${primaryModel}`)[i] ?? null,
   }))
 
