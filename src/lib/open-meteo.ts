@@ -35,40 +35,16 @@ const DAILY_PARAMS = [
   'uv_index_max',
 ].join(',')
 
-interface ForecastResponse {
-  daily?: {
-    time: string[]
-    weather_code: (number | null)[]
-    temperature_2m_max: (number | null)[]
-    temperature_2m_min: (number | null)[]
-    precipitation_sum: (number | null)[]
-    uv_index_max: (number | null)[]
-  }
-  [key: string]: unknown
-}
+// API returns a single hourly/daily object with model-suffixed field names:
+//   hourly.temperature_2m_jma_seamless, hourly.temperature_2m_ecmwf_ifs025, etc.
+//   hourly.time is shared across all models
 
-interface HourlyBlock {
-  time: string[]
-  temperature_2m: (number | null)[]
-  weather_code: (number | null)[]
-  pressure_msl: (number | null)[]
-  surface_pressure: (number | null)[]
-  precipitation: (number | null)[]
-  relative_humidity_2m: (number | null)[]
-  wind_speed_10m: (number | null)[]
-}
+type ApiData = Record<string, unknown>
 
-function parseHourlyBlock(block: HourlyBlock): HourlyPoint[] {
-  return block.time.map((t, i) => ({
-    time: t,
-    temperature: block.temperature_2m[i],
-    weatherCode: block.weather_code[i],
-    pressureMsl: block.pressure_msl[i],
-    surfacePressure: block.surface_pressure[i],
-    precipitation: block.precipitation[i],
-    humidity: block.relative_humidity_2m[i],
-    windSpeed: block.wind_speed_10m[i],
-  }))
+function getArray(obj: ApiData, key: string): (number | null)[] {
+  const val = obj[key]
+  if (Array.isArray(val)) return val
+  return []
 }
 
 export async function fetchMultiModelForecast(
@@ -85,30 +61,50 @@ export async function fetchMultiModelForecast(
     `&timezone=Asia%2FTokyo`
 
   const res = await fetch(url)
-  const data: ForecastResponse = await res.json()
+  const data: { hourly?: ApiData; daily?: ApiData } = await res.json()
 
+  const hourly = data.hourly ?? {}
+  const daily = data.daily ?? {}
+  const hourlyTimes = (hourly.time as string[] | undefined) ?? []
+  const dailyTimes = (daily.time as string[] | undefined) ?? []
+
+  // Parse hourly data per model
   const models: ModelForecast[] = MODELS.map((m) => {
-    const key = `hourly_${m.id}`
-    const block = data[key] as HourlyBlock | undefined
-    return {
-      model: m.label,
-      color: m.color,
-      hourly: block ? parseHourlyBlock(block) : [],
-    }
+    const suffix = `_${m.id}`
+    const temps = getArray(hourly, `temperature_2m${suffix}`)
+    const codes = getArray(hourly, `weather_code${suffix}`)
+    const pMsl = getArray(hourly, `pressure_msl${suffix}`)
+    const pSurf = getArray(hourly, `surface_pressure${suffix}`)
+    const precip = getArray(hourly, `precipitation${suffix}`)
+    const humid = getArray(hourly, `relative_humidity_2m${suffix}`)
+    const wind = getArray(hourly, `wind_speed_10m${suffix}`)
+
+    const points: HourlyPoint[] = hourlyTimes.map((t, i) => ({
+      time: t,
+      temperature: temps[i] ?? null,
+      weatherCode: codes[i] ?? null,
+      pressureMsl: pMsl[i] ?? null,
+      surfacePressure: pSurf[i] ?? null,
+      precipitation: precip[i] ?? null,
+      humidity: humid[i] ?? null,
+      windSpeed: wind[i] ?? null,
+    }))
+
+    return { model: m.label, color: m.color, hourly: points }
   })
 
-  const daily: DailyForecast[] = data.daily
-    ? data.daily.time.map((d, i) => ({
-        date: d,
-        weatherCode: data.daily!.weather_code[i],
-        tempMax: data.daily!.temperature_2m_max[i],
-        tempMin: data.daily!.temperature_2m_min[i],
-        precipSum: data.daily!.precipitation_sum[i],
-        uvIndexMax: data.daily!.uv_index_max[i],
-      }))
-    : []
+  // Parse daily data (use JMA as primary for daily view)
+  const primaryModel = MODELS[0].id
+  const dailyForecasts: DailyForecast[] = dailyTimes.map((d, i) => ({
+    date: d,
+    weatherCode: getArray(daily, `weather_code_${primaryModel}`)[i] ?? null,
+    tempMax: getArray(daily, `temperature_2m_max_${primaryModel}`)[i] ?? null,
+    tempMin: getArray(daily, `temperature_2m_min_${primaryModel}`)[i] ?? null,
+    precipSum: getArray(daily, `precipitation_sum_${primaryModel}`)[i] ?? null,
+    uvIndexMax: getArray(daily, `uv_index_max_${primaryModel}`)[i] ?? null,
+  }))
 
-  return { models, daily }
+  return { models, daily: dailyForecasts }
 }
 
 export async function fetchEnsembleForecast(
@@ -122,37 +118,42 @@ export async function fetchEnsembleForecast(
     `&past_days=3&forecast_days=5` +
     `&timezone=Asia%2FTokyo`
 
-  const res = await fetch(url)
-  const data = await res.json()
-  const hourly = data.hourly as Record<string, unknown> | undefined
-  if (!hourly) return []
+  try {
+    const res = await fetch(url)
+    const data = await res.json()
+    const hourly = data.hourly as Record<string, unknown> | undefined
+    if (!hourly) return []
 
-  const times = hourly.time as string[]
-  const memberKeys = Object.keys(hourly).filter((k) =>
-    k.startsWith('pressure_msl_member')
-  )
+    const times = hourly.time as string[]
+    const memberKeys = Object.keys(hourly).filter((k) =>
+      k.startsWith('pressure_msl_member')
+    )
 
-  if (memberKeys.length === 0) return []
+    if (memberKeys.length === 0) return []
 
-  return times.map((t, i) => {
-    const values = memberKeys
-      .map((k) => (hourly[k] as (number | null)[])[i])
-      .filter((v): v is number => v !== null)
-      .sort((a, b) => a - b)
+    return times.map((t, i) => {
+      const values = memberKeys
+        .map((k) => (hourly[k] as (number | null)[])[i])
+        .filter((v): v is number => v !== null)
+        .sort((a, b) => a - b)
 
-    if (values.length === 0) return { time: t, median: null, p10: null, p90: null }
+      if (values.length === 0)
+        return { time: t, median: null, p10: null, p90: null }
 
-    const p10Idx = Math.floor(values.length * 0.1)
-    const medIdx = Math.floor(values.length * 0.5)
-    const p90Idx = Math.floor(values.length * 0.9)
+      const p10Idx = Math.floor(values.length * 0.1)
+      const medIdx = Math.floor(values.length * 0.5)
+      const p90Idx = Math.floor(values.length * 0.9)
 
-    return {
-      time: t,
-      median: values[medIdx],
-      p10: values[p10Idx],
-      p90: values[p90Idx],
-    }
-  })
+      return {
+        time: t,
+        median: values[medIdx],
+        p10: values[p10Idx],
+        p90: values[p90Idx],
+      }
+    })
+  } catch {
+    return []
+  }
 }
 
 export async function fetchAirQuality(
@@ -195,7 +196,13 @@ export async function searchLocation(query: string): Promise<GeoResult[]> {
   const data = await res.json()
   if (!data.results) return []
   return data.results.map(
-    (r: { name: string; latitude: number; longitude: number; country: string; admin1?: string }) => ({
+    (r: {
+      name: string
+      latitude: number
+      longitude: number
+      country: string
+      admin1?: string
+    }) => ({
       name: r.name,
       latitude: r.latitude,
       longitude: r.longitude,
