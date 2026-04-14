@@ -4,6 +4,7 @@ import { fetchWeatherForLocation } from '../lib/weather-service'
 import type { Location } from '../lib/types'
 import { WeatherCard } from './WeatherCard'
 import { AirQualityCard } from './AirQualityCard'
+import { HeadacheAlert } from './HeadacheAlert'
 import { PressureChart } from './PressureChart'
 import { ForecastTable } from './ForecastTable'
 
@@ -111,6 +112,10 @@ export function Dashboard({ locations, onRemoveLocation }: DashboardProps) {
 
             {data && (
               <div className="space-y-4">
+                <HeadacheAlert
+                  models={data.models}
+                  ensemble={data.ensemble}
+                />
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <WeatherCard amedas={data.amedas} models={data.models} />
                   <AirQualityCard data={data.airQuality} />
