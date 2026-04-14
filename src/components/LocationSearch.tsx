@@ -237,7 +237,7 @@ export function LocationSearch({ onAdd, onClose }: LocationSearchProps) {
           disabled={gpsLoading}
           className="w-full mb-3 px-4 py-2.5 rounded-lg border-2 border-dashed border-blue-300 dark:border-blue-700 text-blue-600 dark:text-blue-400 text-sm font-medium hover:bg-blue-50 dark:hover:bg-blue-900/30 disabled:opacity-50 transition-colors"
         >
-          {gpsLoading ? '取得中...' : '\uD83D\uDCCD 現在地から追加'}
+          {gpsLoading ? '取得中...' : '📍 現在地から追加'}
         </button>
 
         {/* Search */}

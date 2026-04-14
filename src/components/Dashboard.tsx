@@ -60,7 +60,7 @@ export function Dashboard({ locations, onRemoveLocation }: DashboardProps) {
   if (locations.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-slate-500 dark:text-slate-400">
-        <div className="text-5xl mb-4">{'\uD83C\uDF24\uFE0F'}</div>
+        <div className="text-5xl mb-4">{'🌤️'}</div>
         <p className="text-lg mb-2">地点が登録されていません</p>
         <p className="text-sm">右上の「+ 地点追加」から観測地点を追加してください</p>
       </div>

@@ -44,7 +44,7 @@ function App() {
       <header className="sticky top-0 z-40 backdrop-blur-md bg-white/80 dark:bg-slate-900/80 border-b border-slate-200 dark:border-slate-700">
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
           <h1 className="text-lg font-bold flex items-center gap-2">
-            <span>{'\uD83C\uDF24\uFE0F'}</span>
+            <span>{'🌤️'}</span>
             TenkiTracker
           </h1>
           <div className="flex items-center gap-2">
@@ -59,7 +59,7 @@ function App() {
               className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
               title={darkMode ? 'ライトモード' : 'ダークモード'}
             >
-              {darkMode ? '\u2600\uFE0F' : '\uD83C\uDF19'}
+              {darkMode ? '☀️' : '🌙'}
             </button>
           </div>
         </div>
