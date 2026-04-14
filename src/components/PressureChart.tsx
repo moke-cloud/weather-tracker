@@ -140,9 +140,8 @@ export function PressureChart({ models, ensemble, amedas }: PressureChartProps) 
               color: '#e2e8f0',
               fontSize: '12px',
             }}
-            formatter={(value: number, name: string) => [
-              `${value.toFixed(1)} hPa`,
-              name,
+            formatter={(value) => [
+              `${Number(value).toFixed(1)} hPa`,
             ]}
           />
           <Legend
