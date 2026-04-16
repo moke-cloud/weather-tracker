@@ -1,4 +1,13 @@
 import { useState, useCallback } from 'react'
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  ReferenceLine,
+  ResponsiveContainer,
+  Tooltip,
+} from 'recharts'
 import type {
   ModelForecast,
   EnsembleBand,
@@ -222,42 +231,111 @@ export function HeadacheRiskPanel({ models, ensemble }: HeadacheRiskPanelProps) 
   )
 }
 
-/* Mini hourly timeline (24h) */
+/* ── Hourly risk area chart (24h) ── */
+
+function riskColor(score: number): string {
+  if (score >= 76) return '#ef4444'
+  if (score >= 56) return '#f97316'
+  if (score >= 36) return '#eab308'
+  if (score >= 16) return '#10b981'
+  return '#22c55e'
+}
+
 function HourlyMiniTimeline({ hourlyRisk }: { hourlyRisk: HeadacheRiskResult['hourlyRisk'] }) {
   if (hourlyRisk.length === 0) return null
 
+  // Build chart data
+  const data = hourlyRisk.map(hr => ({
+    hour: `${new Date(hr.time).getHours()}`,
+    score: hr.score,
+    fill: riskColor(hr.score),
+  }))
+
+  // Find peak
+  const peak = hourlyRisk.reduce((best, hr) => hr.score > best.score ? hr : best, hourlyRisk[0])
+  const peakHour = new Date(peak.time).getHours()
+
+  // Threshold zones for reference
+  const thresholds = [
+    { y: 36, label: '注意', color: '#eab308' },
+    { y: 56, label: '警戒', color: '#f97316' },
+  ]
+
   return (
     <div>
-      <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">
-        今後24時間のリスク推移
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-xs text-slate-500 dark:text-slate-400">
+          今後24時間のリスク推移
+        </span>
+        {peak.score >= 36 && (
+          <span className="text-[11px] font-medium" style={{ color: riskColor(peak.score) }}>
+            ピーク {peakHour}時 (スコア{peak.score})
+          </span>
+        )}
       </div>
-      <div className="flex items-end gap-px h-10">
-        {hourlyRisk.map((hr, i) => {
-          const hour = new Date(hr.time).getHours()
-          return (
-            <div
-              key={hr.time}
-              className="flex-1 relative group"
-              title={`${hour}時: スコア${hr.score}`}
-            >
-              <div
-                className={`w-full rounded-t-sm min-h-[2px] transition-all ${
-                  hr.score >= 76 ? 'bg-red-400' :
-                  hr.score >= 56 ? 'bg-orange-400' :
-                  hr.score >= 36 ? 'bg-yellow-400' :
-                  hr.score >= 16 ? 'bg-emerald-400' :
-                  'bg-green-300'
-                } ${i === 0 ? 'opacity-100' : ''}`}
-                style={{ height: `${Math.max(hr.score, 5)}%` }}
-              />
-            </div>
-          )
-        })}
-      </div>
-      <div className="flex justify-between text-[10px] text-slate-400 mt-0.5">
-        <span>現在</span>
-        <span>+12h</span>
-        <span>+24h</span>
+      <ResponsiveContainer width="100%" height={90}>
+        <AreaChart data={data} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+          <defs>
+            <linearGradient id="riskGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#f97316" stopOpacity={0.4} />
+              <stop offset="50%" stopColor="#eab308" stopOpacity={0.2} />
+              <stop offset="100%" stopColor="#22c55e" stopOpacity={0.05} />
+            </linearGradient>
+          </defs>
+          <XAxis
+            dataKey="hour"
+            tick={{ fontSize: 9, fill: '#94a3b8' }}
+            tickLine={false}
+            axisLine={false}
+            interval={5}
+            tickFormatter={(v: string) => `${v}時`}
+          />
+          <YAxis
+            domain={[0, 100]}
+            tick={false}
+            axisLine={false}
+            tickLine={false}
+            width={0}
+          />
+          {thresholds.map(t => (
+            <ReferenceLine
+              key={t.y}
+              y={t.y}
+              stroke={t.color}
+              strokeDasharray="3 3"
+              strokeOpacity={0.4}
+            />
+          ))}
+          <Tooltip
+            contentStyle={{
+              backgroundColor: 'rgba(15, 23, 42, 0.9)',
+              border: 'none',
+              borderRadius: '8px',
+              color: '#e2e8f0',
+              fontSize: '11px',
+              padding: '4px 8px',
+            }}
+            formatter={(value) => [`スコア ${value}`, 'リスク']}
+            labelFormatter={(v) => `${v}時`}
+          />
+          <Area
+            type="monotone"
+            dataKey="score"
+            stroke="#f97316"
+            strokeWidth={2}
+            fill="url(#riskGrad)"
+            dot={false}
+            activeDot={{ r: 3, fill: '#f97316' }}
+          />
+        </AreaChart>
+      </ResponsiveContainer>
+      <div className="flex items-center gap-3 text-[10px] text-slate-400 dark:text-slate-500 -mt-1">
+        <span className="flex items-center gap-1">
+          <span className="inline-block w-4 h-0.5 bg-yellow-400 rounded" />注意
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="inline-block w-4 h-0.5 bg-orange-400 rounded" />警戒
+        </span>
       </div>
     </div>
   )
