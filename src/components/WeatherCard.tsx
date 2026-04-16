@@ -15,6 +15,7 @@ export function WeatherCard({ amedas, models }: WeatherCardProps) {
   })
 
   const temp = amedas?.temp ?? currentHour?.temperature
+  const apparentTemp = currentHour?.apparentTemperature ?? null
   const humidity = amedas?.humidity ?? currentHour?.humidity
   const pressureSea = amedas?.pressureSea ?? currentHour?.pressureMsl
   const windSpeed = amedas?.windSpeed ?? currentHour?.windSpeed
@@ -39,6 +40,11 @@ export function WeatherCard({ amedas, models }: WeatherCardProps) {
           <div className="text-3xl font-bold">
             {temp !== null && temp !== undefined ? `${temp.toFixed(1)}\u00B0C` : '--'}
           </div>
+          {apparentTemp !== null && temp != null && Math.abs(apparentTemp - temp) >= 1 && (
+            <div className="text-xs text-slate-500 dark:text-slate-400">
+              体感 {apparentTemp.toFixed(1)}{'\u00B0'}C
+            </div>
+          )}
           <div className="text-sm text-slate-500 dark:text-slate-400">
             {weatherLabel(wCode)}
           </div>

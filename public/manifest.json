@@ -1,0 +1,26 @@
+{
+  "name": "TenkiTracker - 高精度天気・気圧トラッカー",
+  "short_name": "TenkiTracker",
+  "description": "マルチモデル予報比較、研究ベース頭痛リスク予測、気圧トレンド・アンサンブル",
+  "start_url": "/weather-tracker/",
+  "scope": "/weather-tracker/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "orientation": "portrait-primary",
+  "categories": ["weather", "health"],
+  "icons": [
+    {
+      "src": "/weather-tracker/icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/weather-tracker/icon-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

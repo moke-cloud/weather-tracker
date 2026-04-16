@@ -19,6 +19,7 @@ const MODELS = [
 
 const HOURLY_PARAMS = [
   'temperature_2m',
+  'apparent_temperature',
   'weather_code',
   'pressure_msl',
   'surface_pressure',
@@ -74,6 +75,7 @@ export async function fetchMultiModelForecast(
   const models: ModelForecast[] = MODELS.map((m) => {
     const suffix = `_${m.id}`
     const temps = getArray(hourly, `temperature_2m${suffix}`)
+    const apparent = getArray(hourly, `apparent_temperature${suffix}`)
     const codes = getArray(hourly, `weather_code${suffix}`)
     const pMsl = getArray(hourly, `pressure_msl${suffix}`)
     const pSurf = getArray(hourly, `surface_pressure${suffix}`)
@@ -85,6 +87,7 @@ export async function fetchMultiModelForecast(
     const points: HourlyPoint[] = hourlyTimes.map((t, i) => ({
       time: t,
       temperature: temps[i] ?? null,
+      apparentTemperature: apparent[i] ?? null,
       weatherCode: codes[i] ?? null,
       pressureMsl: pMsl[i] ?? null,
       surfacePressure: pSurf[i] ?? null,

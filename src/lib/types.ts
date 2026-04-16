@@ -27,6 +27,7 @@ export interface ModelForecast {
 export interface HourlyPoint {
   time: string
   temperature: number | null
+  apparentTemperature: number | null
   weatherCode: number | null
   pressureMsl: number | null
   surfacePressure: number | null
@@ -77,4 +78,48 @@ export interface GeoSearchResult {
   longitude: number
   country: string
   admin1?: string
+}
+
+/* ── Headache prediction types ── */
+
+export type HeadacheRiskLevel = 'safe' | 'low' | 'moderate' | 'high' | 'critical'
+
+export interface HeadacheFactor {
+  id: string
+  name: string
+  score: number
+  weight: number
+  description: string
+  reference: string
+}
+
+export interface HourlyRisk {
+  time: string
+  score: number
+  level: HeadacheRiskLevel
+}
+
+export interface HeadacheRiskResult {
+  overallScore: number
+  level: HeadacheRiskLevel
+  label: string
+  factors: HeadacheFactor[]
+  hourlyRisk: HourlyRisk[]
+  confidence: number
+  advice: string[]
+  summary: string
+}
+
+/* ── Headache diary ── */
+
+export interface DiaryEntry {
+  id: string
+  timestamp: number
+  severity: 1 | 2 | 3 | 4 | 5
+  riskScore: number
+  pressure: number | null
+  pressureChange3h: number | null
+  temperature: number | null
+  humidity: number | null
+  note: string
 }

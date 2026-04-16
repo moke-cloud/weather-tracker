@@ -56,6 +56,12 @@ export function HourlySummary({ models }: HourlySummaryProps) {
                 <div className="text-xs font-medium">
                   {h.temperature !== null ? `${h.temperature.toFixed(0)}°` : ''}
                 </div>
+                {h.apparentTemperature !== null && h.temperature !== null &&
+                  Math.abs(h.apparentTemperature - h.temperature) >= 2 && (
+                  <div className="text-[9px] text-slate-400 dark:text-slate-500 -mt-0.5">
+                    ({h.apparentTemperature.toFixed(0)}°)
+                  </div>
+                )}
 
                 {/* Precipitation probability bar */}
                 <div className="w-5 h-10 bg-slate-100 dark:bg-slate-700 rounded-sm mt-1 relative overflow-hidden">
