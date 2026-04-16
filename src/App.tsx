@@ -11,9 +11,13 @@ import { LocationSearch } from './components/LocationSearch'
 
 /* ── Platform detection ── */
 
-function isIOS(): boolean {
-  return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-    (navigator.userAgent.includes('Mac') && 'ontouchend' in document)
+type Platform = 'ios' | 'android' | 'desktop'
+
+function detectPlatform(): Platform {
+  const ua = navigator.userAgent
+  if (/iPad|iPhone|iPod/.test(ua) || (ua.includes('Mac') && 'ontouchend' in document)) return 'ios'
+  if (/Android/i.test(ua)) return 'android'
+  return 'desktop'
 }
 
 function isStandalone(): boolean {
@@ -234,7 +238,7 @@ function MenuItem({
 /* ── Install guide modal ── */
 
 function InstallGuide({ onClose }: { onClose: () => void }) {
-  const ios = isIOS()
+  const platform = detectPlatform()
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
@@ -242,32 +246,61 @@ function InstallGuide({ onClose }: { onClose: () => void }) {
       <div className="relative w-full max-w-sm bg-white dark:bg-slate-800 rounded-2xl shadow-xl p-5">
         <h2 className="text-lg font-bold mb-3">アプリをインストール</h2>
 
-        {ios ? (
+        {platform === 'ios' && (
           <div className="space-y-3 text-sm">
             <p className="text-slate-600 dark:text-slate-300">
-              iPhoneやiPadにインストールするには:
+              iPhone / iPad にインストール:
             </p>
             <div className="space-y-2">
-              <Step n={1} text={'Safari下部の共有ボタン \u{1F4E4} をタップ'} />
+              <Step n={1} text={'Safariで開き、下部の共有ボタン \u{1F4E4} をタップ'} />
               <Step n={2} text={'"ホーム画面に追加" をタップ'} />
               <Step n={3} text={'"追加" をタップして完了'} />
             </div>
             <p className="text-xs text-slate-400 dark:text-slate-500">
-              ※ Safari以外のブラウザではインストールできません
+              ※ Safari でのみインストール可能です
             </p>
           </div>
-        ) : (
+        )}
+
+        {platform === 'android' && (
           <div className="space-y-3 text-sm">
             <p className="text-slate-600 dark:text-slate-300">
-              PCやAndroidにインストールするには:
+              Android にインストール:
+            </p>
+            <div className="space-y-4">
+              <div>
+                <p className="font-medium text-slate-700 dark:text-slate-200 mb-1.5">Chrome の場合</p>
+                <div className="space-y-2">
+                  <Step n={1} text={'右上メニュー \u22EE をタップ'} />
+                  <Step n={2} text={'"アプリをインストール" をタップ'} />
+                </div>
+              </div>
+              <div>
+                <p className="font-medium text-slate-700 dark:text-slate-200 mb-1.5">Firefox / その他のブラウザ</p>
+                <div className="space-y-2">
+                  <Step n={1} text={'右上メニュー \u22EE をタップ'} />
+                  <Step n={2} text={'"ホーム画面に追加" をタップ'} />
+                </div>
+              </div>
+            </div>
+            <p className="text-xs text-slate-400 dark:text-slate-500">
+              ※ Chrome を推奨（通知機能も利用可能）
+            </p>
+          </div>
+        )}
+
+        {platform === 'desktop' && (
+          <div className="space-y-3 text-sm">
+            <p className="text-slate-600 dark:text-slate-300">
+              PC にインストール:
             </p>
             <div className="space-y-2">
               <Step n={1} text={'アドレスバー右端の \u{2B07}\uFE0F アイコンをクリック'} />
-              <Step n={2} text={'または ブラウザメニュー \u22EE →「アプリをインストール」'} />
+              <Step n={2} text={'または ブラウザメニュー \u22EE \u2192「アプリをインストール」'} />
               <Step n={3} text={'"インストール" をクリックして完了'} />
             </div>
             <p className="text-xs text-slate-400 dark:text-slate-500">
-              ※ Chrome, Edge, Samsung Internet に対応
+              ※ Chrome / Edge に対応
             </p>
           </div>
         )}
