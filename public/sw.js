@@ -1,12 +1,12 @@
 /// <reference lib="webworker" />
 
-const CACHE_NAME = 'tenki-tracker-v2'
+const CACHE_NAME = 'tenki-tracker-v3'
 const STATIC_ASSETS = [
   '/weather-tracker/',
   '/weather-tracker/index.html',
   '/weather-tracker/manifest.json',
-  '/weather-tracker/icon-192.svg',
-  '/weather-tracker/icon-512.svg',
+  '/weather-tracker/icon-192.png',
+  '/weather-tracker/icon-512.png',
 ]
 
 // Install: pre-cache app shell
@@ -29,14 +29,15 @@ self.addEventListener('activate', (event) => {
   self.clients.claim()
 })
 
-// Fetch: network-first for API, cache-first for assets
+// Fetch: network-first for API, stale-while-revalidate for assets
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url)
 
-  // API calls: always network
+  // API calls + postal code lookup: always network
   if (
     url.hostname.includes('open-meteo.com') ||
-    url.hostname.includes('jma.go.jp')
+    url.hostname.includes('jma.go.jp') ||
+    url.hostname.includes('zipcloud')
   ) {
     event.respondWith(fetch(event.request))
     return

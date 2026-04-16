@@ -9,12 +9,25 @@ import {
 import { Dashboard } from './components/Dashboard'
 import { LocationSearch } from './components/LocationSearch'
 
+/* ── Platform detection ── */
+
+function isIOS(): boolean {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.userAgent.includes('Mac') && 'ontouchend' in document)
+}
+
+function isStandalone(): boolean {
+  return window.matchMedia('(display-mode: standalone)').matches ||
+    ('standalone' in navigator && (navigator as unknown as { standalone: boolean }).standalone)
+}
+
 function App() {
   const [locations, setLocations] = useState<Location[]>([])
   const [showSearch, setShowSearch] = useState(false)
+  const [showInstallGuide, setShowInstallGuide] = useState(false)
   const [notifEnabled, setNotifEnabled] = useState(isNotificationEnabled)
-  const [showInstallBanner, setShowInstallBanner] = useState(false)
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null)
+  const [installed, setInstalled] = useState(isStandalone)
   const [darkMode, setDarkMode] = useState(() => {
     if (typeof window !== 'undefined') {
       return (
@@ -35,26 +48,35 @@ function App() {
     localStorage.setItem('theme', darkMode ? 'dark' : 'light')
   }, [darkMode])
 
-  // PWA install prompt
+  // PWA install prompt (Chrome/Edge/Samsung)
   useEffect(() => {
     const handler = (e: Event) => {
       e.preventDefault()
       setDeferredPrompt(e as BeforeInstallPromptEvent)
-      // Show banner if not already installed
-      if (!window.matchMedia('(display-mode: standalone)').matches) {
-        setShowInstallBanner(true)
-      }
     }
     window.addEventListener('beforeinstallprompt', handler)
-    return () => window.removeEventListener('beforeinstallprompt', handler)
+
+    const installedHandler = () => setInstalled(true)
+    window.addEventListener('appinstalled', installedHandler)
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handler)
+      window.removeEventListener('appinstalled', installedHandler)
+    }
   }, [])
 
   const handleInstall = useCallback(async () => {
-    if (!deferredPrompt) return
-    deferredPrompt.prompt()
-    await deferredPrompt.userChoice
-    setDeferredPrompt(null)
-    setShowInstallBanner(false)
+    if (deferredPrompt) {
+      deferredPrompt.prompt()
+      const result = await deferredPrompt.userChoice
+      if (result.outcome === 'accepted') {
+        setInstalled(true)
+      }
+      setDeferredPrompt(null)
+    } else {
+      // No deferred prompt → show manual guide
+      setShowInstallGuide(true)
+    }
   }, [deferredPrompt])
 
   const handleAddLocation = useCallback(async (location: Location) => {
@@ -80,27 +102,6 @@ function App() {
 
   return (
     <div className="min-h-dvh bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100">
-      {/* PWA install banner */}
-      {showInstallBanner && (
-        <div className="bg-blue-600 text-white text-sm px-4 py-2 flex items-center justify-between">
-          <span>TenkiTrackerをホーム画面に追加して素早くアクセス</span>
-          <div className="flex gap-2">
-            <button
-              onClick={handleInstall}
-              className="px-3 py-1 bg-white text-blue-600 rounded-lg text-xs font-medium"
-            >
-              インストール
-            </button>
-            <button
-              onClick={() => setShowInstallBanner(false)}
-              className="text-white/70 hover:text-white px-1"
-            >
-              {'\u2715'}
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Header */}
       <header className="sticky top-0 z-40 backdrop-blur-md bg-white/80 dark:bg-slate-900/80 border-b border-slate-200 dark:border-slate-700">
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
@@ -108,7 +109,17 @@ function App() {
             <span>{'\u{1F324}\uFE0F'}</span>
             TenkiTracker
           </h1>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
+            {/* Install button - always visible unless already installed */}
+            {!installed && (
+              <button
+                onClick={handleInstall}
+                className="px-2.5 py-1.5 text-xs font-medium rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors flex items-center gap-1"
+                title="アプリをインストール"
+              >
+                {'\u{2B07}\uFE0F'} インストール
+              </button>
+            )}
             {/* Notification toggle */}
             <button
               onClick={toggleNotifications}
@@ -149,7 +160,7 @@ function App() {
           データソース: JMA AMeDAS (実測値) / Open-Meteo (JMA MSM, ECMWF IFS, GFS 予報 + アンサンブル)
         </p>
         <p className="mt-1">
-          マルチモデル比較 + アンサンブル信頼帯で予報の確信度を可視化 | 頭痛予測は医学論文ベースの多因子モデル
+          頭痛予測は医学論文ベースの多因子モデル (Kimoto 2011, Mukamal 2009 他)
         </p>
       </footer>
 
@@ -157,6 +168,74 @@ function App() {
       {showSearch && (
         <LocationSearch onAdd={handleAddLocation} onClose={() => setShowSearch(false)} />
       )}
+
+      {/* Install guide modal */}
+      {showInstallGuide && (
+        <InstallGuide onClose={() => setShowInstallGuide(false)} />
+      )}
+    </div>
+  )
+}
+
+/* ── Install guide modal ── */
+
+function InstallGuide({ onClose }: { onClose: () => void }) {
+  const ios = isIOS()
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="relative w-full max-w-sm bg-white dark:bg-slate-800 rounded-2xl shadow-xl p-5">
+        <h2 className="text-lg font-bold mb-3">アプリをインストール</h2>
+
+        {ios ? (
+          <div className="space-y-3 text-sm">
+            <p className="text-slate-600 dark:text-slate-300">
+              iPhoneやiPadにインストールするには:
+            </p>
+            <div className="space-y-2">
+              <Step n={1} text={'Safari下部の共有ボタン \u{1F4E4} をタップ'} />
+              <Step n={2} text="「ホーム画面に追加」をタップ" />
+              <Step n={3} text="「追加」をタップして完了" />
+            </div>
+            <p className="text-xs text-slate-400 dark:text-slate-500">
+              ※ Safari以外のブラウザではインストールできません
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-3 text-sm">
+            <p className="text-slate-600 dark:text-slate-300">
+              PCやAndroidにインストールするには:
+            </p>
+            <div className="space-y-2">
+              <Step n={1} text={'アドレスバー右端の \u{2B07}\uFE0F インストールアイコンをクリック'} />
+              <Step n={2} text={'または、ブラウザメニュー \u22EE → 「アプリをインストール」'} />
+              <Step n={3} text="「インストール」をクリックして完了" />
+            </div>
+            <p className="text-xs text-slate-400 dark:text-slate-500">
+              ※ Chrome, Edge, Samsung Internet に対応
+            </p>
+          </div>
+        )}
+
+        <button
+          onClick={onClose}
+          className="mt-4 w-full py-2 text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
+        >
+          閉じる
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function Step({ n, text }: { n: number; text: string }) {
+  return (
+    <div className="flex items-start gap-3">
+      <span className="shrink-0 w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 text-xs font-bold flex items-center justify-center">
+        {n}
+      </span>
+      <span className="text-slate-700 dark:text-slate-200 pt-0.5">{text}</span>
     </div>
   )
 }

@@ -18,9 +18,13 @@ export async function lookupPostalCode(code: string): Promise<PostalResult | nul
   if (clean.length !== 7) return null
 
   const res = await fetch(`${ZIPCLOUD_URL}?zipcode=${clean}`)
+  if (!res.ok) return null
+
   const data = await res.json()
 
-  if (data.status !== 200 || !data.results?.length) return null
+  // zipcloud returns status as number 200 or string "200" depending on version
+  // Use loose equality to handle both
+  if (data.status != 200 || !data.results?.length) return null
 
   const r = data.results[0] as {
     zipcode: string

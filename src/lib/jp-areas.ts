@@ -432,27 +432,107 @@ export function getAllAreas(): AreaEntry[] {
   return list
 }
 
-/** Match an address (from postal code) to the closest area entry */
-export function matchAddress(_prefecture: string, city: string, area: string): AreaEntry | null {
+/**
+ * Match a zipcloud address to the closest area entry.
+ *
+ * zipcloud response patterns for designated cities:
+ *   address1="神奈川県" address2="横浜市西区" address3="高島"
+ *   address1="東京都"   address2="千代田区"   address3="千代田"
+ *   address1="北海道"   address2="札幌市中央区" address3="..."
+ *
+ * Strategy:
+ *  1. Use prefecture to narrow to the correct region
+ *  2. Match parent city name from the city string
+ *  3. Match ward within that city only (avoids 北区/中央区 cross-city collision)
+ *  4. Fall back to city-level match
+ */
+export function matchAddress(prefecture: string, city: string, area: string): AreaEntry | null {
+  // Step 1: Try to find the parent city by checking if `city` contains the city name
+  // e.g. city="横浜市西区" contains "横浜", city="千代田区" doesn't contain any city name
   for (const r of REGIONS) {
     for (const c of r.cities) {
-      // Ward-level match: e.g. city="千代田区" or city="横浜市中区"
-      for (const w of c.wards) {
-        if (city.includes(w.name) || (city.includes(c.city.replace('市', '')) && area.includes(w.name))) {
-          return { ...w, label: `${c.city}${w.name}` }
+      const cityBase = c.city.replace(/[市区]$/, '').replace(/23区$/, '')
+
+      // Check if this is the right parent city
+      // Pattern A: "横浜市西区" → contains "横浜"
+      // Pattern B: "札幌市中央区" → contains "札幌"
+      const isCityMatch = city.includes(cityBase) && cityBase.length >= 2
+
+      if (!isCityMatch) continue
+
+      // Also verify prefecture matches to avoid same-name cities across prefectures
+      if (!c.label.includes(prefecture.replace(/[都府県]$/, '')) &&
+          !prefecture.includes(c.label.replace(/[都府県]$/, ''))) {
+        continue
+      }
+
+      // Found the parent city. Now find the ward within it.
+      if (c.wards.length > 0) {
+        // Extract the ward name from the city string
+        // e.g. "横浜市西区" → "西区", "札幌市中央区" → "中央区"
+        for (const w of c.wards) {
+          if (city.endsWith(w.name) || city.includes(w.name)) {
+            return { ...w, label: `${c.city}${w.name}` }
+          }
         }
       }
-      // For designated cities, city field from postal code might be "横浜市中区"
-      const wardInCity = c.wards.find(w =>
-        city.endsWith(w.name) || city === `${c.city}${w.name}`
-      )
-      if (wardInCity) return { ...wardInCity, label: `${c.city}${wardInCity.name}` }
 
-      // City-level match
-      if (city.startsWith(c.city.replace(/市$/, '')) || c.city.startsWith(city.replace(/[市区町村]$/, ''))) {
-        return { name: c.city, lat: c.lat, lon: c.lon, label: c.label }
+      // City matched but no ward match → return city-level
+      return { name: c.city, lat: c.lat, lon: c.lon, label: c.label }
+    }
+  }
+
+  // Step 2: Handle Tokyo 23 wards where city="千代田区" (no parent city prefix)
+  // zipcloud returns address1="東京都" address2="千代田区"
+  if (prefecture.startsWith('東京')) {
+    const tokyo = REGIONS.flatMap(r => r.cities).find(c => c.city === '東京23区')
+    if (tokyo) {
+      const ward = tokyo.wards.find(w => city === w.name || city.endsWith(w.name))
+      if (ward) {
+        return { ...ward, label: `東京都${ward.name}` }
+      }
+      // Check Tokyo non-ward cities (八王子市, 立川市, etc.)
+      const kantoRegion = REGIONS.find(r => r.region === '関東')
+      if (kantoRegion) {
+        for (const c of kantoRegion.cities) {
+          if (c.wards.length === 0 && c.label === '東京都') {
+            const base = c.city.replace(/市$/, '')
+            if (city.includes(base)) {
+              return { name: c.city, lat: c.lat, lon: c.lon, label: '東京都' }
+            }
+          }
+        }
       }
     }
   }
+
+  // Step 3: Simple city-level fallback (non-designated cities)
+  for (const r of REGIONS) {
+    for (const c of r.cities) {
+      if (c.wards.length > 0) continue // skip designated cities (handled above)
+      const cityBase = c.city.replace(/市$/, '')
+      if (city.includes(cityBase) || cityBase.includes(city.replace(/[市区町村]$/, ''))) {
+        // Verify prefecture
+        if (c.label.includes(prefecture.replace(/[都府県]$/, '')) ||
+            prefecture.includes(c.label.replace(/[都府県]$/, ''))) {
+          return { name: c.city, lat: c.lat, lon: c.lon, label: c.label }
+        }
+      }
+    }
+  }
+
+  // Step 4: Broad area match as last resort
+  for (const r of REGIONS) {
+    for (const c of r.cities) {
+      if (c.wards.length > 0) {
+        for (const w of c.wards) {
+          if (area.includes(w.name.replace(/区$/, '')) && w.name.length > 2) {
+            return { ...w, label: `${c.city}${w.name}` }
+          }
+        }
+      }
+    }
+  }
+
   return null
 }
