@@ -27,6 +27,14 @@ import { HeadacheDiary } from './HeadacheDiary'
 import { HourlySummary } from './HourlySummary'
 import { PressureChart } from './PressureChart'
 import { ForecastTable } from './ForecastTable'
+import { InfoTooltip } from './InfoTooltip'
+import type { GlossaryKey } from '../lib/glossary'
+
+const MODEL_TERM: Record<string, GlossaryKey> = {
+  JMA: 'jmaMsm',
+  ECMWF: 'ecmwfIfs',
+  GFS: 'gfs',
+}
 
 const AUTO_REFRESH_MS = 10 * 60_000 // 10 minutes
 
@@ -449,8 +457,11 @@ function ModelComparisonInfo({ models }: { models: LocationWeather['models'] }) 
             {models.map(m => (
               <tr key={m.model} className="border-b border-slate-100 dark:border-slate-700/50">
                 <td className="py-1.5 px-2">
-                  <span className="inline-block w-2 h-2 rounded-full mr-1" style={{ backgroundColor: m.color }} />
-                  {m.model}
+                  <span className="inline-flex items-center gap-1">
+                    <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: m.color }} />
+                    {m.model}
+                    {MODEL_TERM[m.model] && <InfoTooltip term={MODEL_TERM[m.model]} />}
+                  </span>
                 </td>
                 {hours.map(h => {
                   const point = m.hourly.find(p => {
@@ -458,9 +469,9 @@ function ModelComparisonInfo({ models }: { models: LocationWeather['models'] }) 
                     return diff < 2 * 3600_000
                   })
                   return (
-                    <td key={h.toISOString()} className="py-1.5 px-1 text-center">
+                    <td key={h.toISOString()} className="py-1.5 px-1 text-center" title="気温 (℃)">
                       {point?.temperature !== null && point?.temperature !== undefined
-                        ? `${point.temperature.toFixed(0)}\u00B0`
+                        ? `${point.temperature.toFixed(0)}\u00B0C`
                         : '--'}
                     </td>
                   )
@@ -470,8 +481,9 @@ function ModelComparisonInfo({ models }: { models: LocationWeather['models'] }) 
           </tbody>
         </table>
       </div>
-      <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-2">
-        モデル間の温度差が大きいほど予報の不確実性が高い
+      <p className="inline-flex items-center gap-1 text-[10px] text-slate-400 dark:text-slate-500 mt-2">
+        数値は予報気温(℃)。モデル間の温度差が大きいほど予報の不確実性が高い
+        <InfoTooltip term="modelDivergence" />
       </p>
     </div>
   )

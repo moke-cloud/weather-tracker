@@ -1,5 +1,6 @@
 import type { DailyForecast } from '../lib/types'
 import { weatherIcon, formatDate } from '../lib/utils'
+import { InfoTooltip } from './InfoTooltip'
 
 interface ForecastTableProps {
   daily: DailyForecast[]
@@ -15,6 +16,17 @@ export function ForecastTable({ daily }: ForecastTableProps) {
         {daily.slice(0, 7).map((d) => (
           <DayCard key={d.date} day={d} />
         ))}
+      </div>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-[10px] text-slate-400 dark:text-slate-500">
+        <span>🔴 最高気温 / 🔵 最低気温 (℃)</span>
+        <span className="inline-flex items-center gap-1">
+          ☔ 最大降水確率 (%)
+          <InfoTooltip term="precipProbability" />
+        </span>
+        <span className="inline-flex items-center gap-1">
+          💧 合計降水量 (mm)
+          <InfoTooltip term="precipitation" />
+        </span>
       </div>
     </div>
   )
@@ -55,8 +67,8 @@ function DayCard({ day }: { day: DailyForecast }) {
           </>
         )}
       </div>
-      <div className="text-lg my-1">{weatherIcon(day.weatherCode)}</div>
-      <div className="text-xs">
+      <div className="text-lg my-1" title="天気">{weatherIcon(day.weatherCode)}</div>
+      <div className="text-xs" title="最高/最低気温 (℃)">
         <span className="text-red-500 font-medium">
           {day.tempMax !== null ? `${day.tempMax.toFixed(0)}\u00B0` : '--'}
         </span>
@@ -72,12 +84,13 @@ function DayCard({ day }: { day: DailyForecast }) {
               ? 'text-blue-600 dark:text-blue-400'
               : 'text-slate-400'
           }`}
+          title={`最大降水確率 ${day.precipProbMax}%`}
         >
           ☔{day.precipProbMax}%
         </div>
       )}
       {day.precipSum !== null && day.precipSum > 0 && (
-        <div className="text-[10px] text-blue-500">
+        <div className="text-[10px] text-blue-500" title={`1日の合計降水量 ${day.precipSum.toFixed(1)} mm`}>
           {day.precipSum.toFixed(0)}mm
         </div>
       )}

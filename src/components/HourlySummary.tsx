@@ -1,5 +1,6 @@
 import type { ModelForecast } from '../lib/types'
-import { weatherIcon } from '../lib/utils'
+import { weatherIcon, computeApparentTemperature } from '../lib/utils'
+import { InfoTooltip } from './InfoTooltip'
 
 interface HourlySummaryProps {
   models: ModelForecast[]
@@ -54,17 +55,29 @@ export function HourlySummary({ models }: HourlySummaryProps) {
 
                 {/* Temperature */}
                 <div className="text-xs font-medium">
-                  {h.temperature !== null ? `${h.temperature.toFixed(0)}°` : ''}
+                  {h.temperature !== null ? `${h.temperature.toFixed(0)}°C` : ''}
                 </div>
-                {h.apparentTemperature !== null && h.temperature !== null &&
-                  Math.abs(h.apparentTemperature - h.temperature) >= 2 && (
-                  <div className="text-[9px] text-slate-400 dark:text-slate-500 -mt-0.5">
-                    ({h.apparentTemperature.toFixed(0)}°)
-                  </div>
-                )}
+                {(() => {
+                  const feels =
+                    h.apparentTemperature ??
+                    computeApparentTemperature(h.temperature, h.humidity, h.windSpeed)
+                  if (feels === null || h.temperature === null) return null
+                  if (Math.abs(feels - h.temperature) < 2) return null
+                  return (
+                    <div
+                      className="text-[9px] text-slate-400 dark:text-slate-500 -mt-0.5"
+                      title={`体感 ${feels.toFixed(0)}℃ (気温${h.temperature.toFixed(0)}℃との差${(feels - h.temperature).toFixed(1)}℃)`}
+                    >
+                      (体感{feels.toFixed(0)}°)
+                    </div>
+                  )
+                })()}
 
                 {/* Precipitation probability bar */}
-                <div className="w-5 h-10 bg-slate-100 dark:bg-slate-700 rounded-sm mt-1 relative overflow-hidden">
+                <div
+                  className="w-5 h-10 bg-slate-100 dark:bg-slate-700 rounded-sm mt-1 relative overflow-hidden"
+                  title={prob !== null ? `降水確率 ${prob}%` : ''}
+                >
                   {prob !== null && prob > 0 && (
                     <div
                       className={`absolute bottom-0 w-full rounded-sm transition-all ${
@@ -101,8 +114,21 @@ export function HourlySummary({ models }: HourlySummaryProps) {
           })}
         </div>
       </div>
-      <div className="flex items-center gap-3 mt-2 text-[10px] text-slate-400 dark:text-slate-500">
-        <span>☀️ 天気 / 🌡️ 気温 / 🌧 降水確率 (ECMWF)</span>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-[10px] text-slate-400 dark:text-slate-500">
+        <span className="inline-flex items-center gap-1">
+          🌡️ 気温 (℃)
+          <span className="opacity-75">/ カッコ内は</span>
+          <span className="opacity-75">体感温度</span>
+          <InfoTooltip term="apparentTemperature" />
+        </span>
+        <span className="inline-flex items-center gap-1">
+          🌧 降水確率 (%)
+          <InfoTooltip term="precipProbability" />
+        </span>
+        <span className="inline-flex items-center gap-1">
+          降水確率の出典: ECMWF
+          <InfoTooltip term="ecmwfIfs" />
+        </span>
       </div>
     </div>
   )

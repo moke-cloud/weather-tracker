@@ -77,6 +77,42 @@ export function aqiLevel(aqi: number | null): { label: string; color: string } {
   return { label: '非常に不健康', color: 'text-purple-600' }
 }
 
+/**
+ * 体感温度 (Apparent Temperature) を計算する。
+ *
+ * Australian Bureau of Meteorology の式 (Steadman 1994)。
+ * Open-Meteo の apparent_temperature も同じ式を採用している。
+ *
+ *   AT = Ta + 0.33 × e − 0.70 × ws − 4.00
+ *   e  = (RH / 100) × 6.105 × exp(17.27 × Ta / (237.7 + Ta))
+ *
+ * - Ta: 気温 (℃)
+ * - RH: 相対湿度 (%, 0-100)
+ * - ws: 風速 (m/s) - 10m高度想定
+ * - e : 水蒸気圧 (hPa)
+ *
+ * 湿度・風速がnullの場合は、利用可能な成分のみで近似値を返す
+ * (湿度null時は湿度50%相当、風速null時は0 m/sで計算)。
+ *
+ * 気温が無い場合のみnullを返す。
+ */
+export function computeApparentTemperature(
+  temperature: number | null,
+  humidity: number | null,
+  windSpeed: number | null,
+): number | null {
+  if (temperature === null || !Number.isFinite(temperature)) return null
+
+  const ta = temperature
+  const rh = humidity !== null && Number.isFinite(humidity) ? humidity : 50
+  const ws = windSpeed !== null && Number.isFinite(windSpeed) ? windSpeed : 0
+
+  // Water vapor pressure (hPa)
+  const e = (rh / 100) * 6.105 * Math.exp((17.27 * ta) / (237.7 + ta))
+  const at = ta + 0.33 * e - 0.70 * ws - 4.0
+  return Math.round(at * 10) / 10
+}
+
 export function pressureChangeRate(
   pressures: { time: string; value: number }[]
 ): number | null {

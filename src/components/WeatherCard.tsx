@@ -1,5 +1,12 @@
 import type { AmedasObservation, ModelForecast } from '../lib/types'
-import { windDirectionLabel, weatherIcon, weatherLabel } from '../lib/utils'
+import {
+  windDirectionLabel,
+  weatherIcon,
+  weatherLabel,
+  computeApparentTemperature,
+} from '../lib/utils'
+import { InfoTooltip } from './InfoTooltip'
+import type { GlossaryKey } from '../lib/glossary'
 
 interface WeatherCardProps {
   amedas: AmedasObservation | null
@@ -14,14 +21,20 @@ export function WeatherCard({ amedas, models }: WeatherCardProps) {
     return Math.abs(t.getTime() - now.getTime()) < 3600_000
   })
 
-  const temp = amedas?.temp ?? currentHour?.temperature
-  const apparentTemp = currentHour?.apparentTemperature ?? null
-  const humidity = amedas?.humidity ?? currentHour?.humidity
+  const temp = amedas?.temp ?? currentHour?.temperature ?? null
+  const humidity = amedas?.humidity ?? currentHour?.humidity ?? null
   const pressureSea = amedas?.pressureSea ?? currentHour?.pressureMsl
-  const windSpeed = amedas?.windSpeed ?? currentHour?.windSpeed
+  const windSpeed = amedas?.windSpeed ?? currentHour?.windSpeed ?? null
   const precip = amedas?.precipitation1h ?? currentHour?.precipitation
   const wCode = currentHour?.weatherCode ?? null
   const source = amedas ? 'AMeDAS実測' : 'JMA予報'
+  const sourceTerm: GlossaryKey = amedas ? 'amedas' : 'jmaMsm'
+
+  // 体感温度: AMeDAS実測があれば計算、なければ予報モデルの apparent_temperature を使用
+  const apparentTemp = amedas
+    ? computeApparentTemperature(temp, humidity, windSpeed)
+    : currentHour?.apparentTemperature ?? computeApparentTemperature(temp, humidity, windSpeed)
+  const apparentSource = amedas ? '計算値' : '予報値'
 
   return (
     <div className="rounded-xl bg-white dark:bg-slate-800 p-4 shadow-sm">
@@ -29,8 +42,9 @@ export function WeatherCard({ amedas, models }: WeatherCardProps) {
         <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400">
           現在の天気
         </h3>
-        <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300">
+        <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300">
           {source}
+          <InfoTooltip term={sourceTerm} className="text-blue-600 dark:text-blue-300" />
         </span>
       </div>
 
@@ -40,9 +54,11 @@ export function WeatherCard({ amedas, models }: WeatherCardProps) {
           <div className="text-3xl font-bold">
             {temp !== null && temp !== undefined ? `${temp.toFixed(1)}\u00B0C` : '--'}
           </div>
-          {apparentTemp !== null && temp != null && Math.abs(apparentTemp - temp) >= 1 && (
-            <div className="text-xs text-slate-500 dark:text-slate-400">
+          {apparentTemp !== null && temp != null && (
+            <div className="inline-flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
               体感 {apparentTemp.toFixed(1)}{'\u00B0'}C
+              <span className="text-[10px] opacity-75">({apparentSource})</span>
+              <InfoTooltip term="apparentTemperature" />
             </div>
           )}
           <div className="text-sm text-slate-500 dark:text-slate-400">
@@ -52,32 +68,57 @@ export function WeatherCard({ amedas, models }: WeatherCardProps) {
       </div>
 
       <div className="grid grid-cols-2 gap-3 text-sm">
-        <Stat label="海面気圧" value={pressureSea != null ? `${pressureSea.toFixed(1)} hPa` : '--'} />
-        <Stat label="湿度" value={humidity != null ? `${humidity}%` : '--'} />
+        <Stat
+          label="海面気圧"
+          term="pressureHpa"
+          value={pressureSea != null ? `${pressureSea.toFixed(1)} hPa` : '--'}
+        />
+        <Stat
+          label="湿度"
+          term="humidity"
+          value={humidity != null ? `${humidity}%` : '--'}
+        />
         <Stat
           label="風速"
+          term="windSpeed"
           value={
             windSpeed != null
               ? `${windSpeed.toFixed(1)} m/s ${amedas?.windDirection ? windDirectionLabel(Number(amedas.windDirection)) : ''}`
               : '--'
           }
         />
-        <Stat label="降水量" value={precip != null ? `${precip.toFixed(1)} mm/h` : '--'} />
+        <Stat
+          label="降水量"
+          term="precipitation"
+          value={precip != null ? `${precip.toFixed(1)} mm/h` : '--'}
+        />
       </div>
 
       {amedas && (
-        <div className="mt-2 text-xs text-slate-400 dark:text-slate-500">
+        <div className="inline-flex items-center gap-1 mt-2 text-xs text-slate-400 dark:text-slate-500">
           観測時刻: {new Date(amedas.time).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}
+          <InfoTooltip term="observationTime" />
         </div>
       )}
     </div>
   )
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({
+  label,
+  value,
+  term,
+}: {
+  label: string
+  value: string
+  term?: GlossaryKey
+}) {
   return (
     <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-2">
-      <div className="text-xs text-slate-500 dark:text-slate-400">{label}</div>
+      <div className="inline-flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
+        {label}
+        {term && <InfoTooltip term={term} />}
+      </div>
       <div className="font-medium">{value}</div>
     </div>
   )
