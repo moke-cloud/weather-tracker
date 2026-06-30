@@ -1,5 +1,7 @@
 import type { DailyForecast } from '../lib/types'
-import { weatherIcon, formatDate } from '../lib/utils'
+import { formatDate } from '../lib/utils'
+import { WeatherIcon } from './WeatherIcon'
+import { StatusDot, UmbrellaIcon, DropletIcon } from './icons'
 import { InfoTooltip } from './InfoTooltip'
 
 interface ForecastTableProps {
@@ -8,23 +10,24 @@ interface ForecastTableProps {
 
 export function ForecastTable({ daily }: ForecastTableProps) {
   return (
-    <div className="rounded-xl bg-white dark:bg-slate-800 p-4 shadow-sm">
-      <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-2">
-        週間予報
-      </h3>
+    <div className="rounded-lg bg-surface p-4 shadow-md">
+      <h3 className="text-xs font-medium tracking-wide text-ink-muted mb-2">週間予報</h3>
       <div className="flex gap-2 overflow-x-auto pb-1">
         {daily.slice(0, 7).map((d) => (
           <DayCard key={d.date} day={d} />
         ))}
       </div>
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-[10px] text-slate-400 dark:text-slate-500">
-        <span>🔴 最高気温 / 🔵 最低気温 (℃)</span>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-[10px] text-ink-subtle">
         <span className="inline-flex items-center gap-1">
-          ☔ 最大降水確率 (%)
+          <StatusDot className="bg-hot" size={8} /> 最高 /
+          <StatusDot className="bg-cool" size={8} /> 最低 (℃)
+        </span>
+        <span className="inline-flex items-center gap-1">
+          <UmbrellaIcon size={12} className="text-cool" /> 最大降水確率 (%)
           <InfoTooltip term="precipProbability" />
         </span>
         <span className="inline-flex items-center gap-1">
-          💧 合計降水量 (mm)
+          <DropletIcon size={12} className="text-cool" /> 合計降水量 (mm)
           <InfoTooltip term="precipitation" />
         </span>
       </div>
@@ -36,29 +39,28 @@ function DayCard({ day }: { day: DailyForecast }) {
   const weekdays = ['日', '月', '火', '水', '木', '金', '土']
   const d = new Date(day.date + 'T00:00:00')
   const wd = weekdays[d.getDay()]
-  const isToday =
-    new Date().toDateString() === d.toDateString()
+  const isToday = new Date().toDateString() === d.toDateString()
 
   return (
     <div
-      className={`flex-shrink-0 w-16 text-center rounded-lg p-2 ${
+      className={`flex-shrink-0 w-16 text-center rounded-md p-2 ${
         isToday
-          ? 'bg-blue-50 dark:bg-blue-900/30 ring-1 ring-blue-300 dark:ring-blue-700'
-          : 'bg-slate-50 dark:bg-slate-700/50'
+          ? 'bg-accent-soft ring-1 ring-accent/40'
+          : 'bg-surface-sunk'
       }`}
     >
-      <div className="text-xs text-slate-500 dark:text-slate-400">
+      <div className="nums text-xs text-ink-muted">
         {isToday ? (
-          <span className="font-bold text-blue-600 dark:text-blue-400">今日</span>
+          <span className="font-bold text-accent-strong">今日</span>
         ) : (
           <>
             {formatDate(day.date + 'T00:00:00')}
             <span
               className={
                 wd === '日'
-                  ? 'text-red-500 ml-0.5'
+                  ? 'text-hot ml-0.5'
                   : wd === '土'
-                    ? 'text-blue-500 ml-0.5'
+                    ? 'text-cool ml-0.5'
                     : 'ml-0.5'
               }
             >
@@ -67,30 +69,30 @@ function DayCard({ day }: { day: DailyForecast }) {
           </>
         )}
       </div>
-      <div className="text-lg my-1" title="天気">{weatherIcon(day.weatherCode)}</div>
-      <div className="text-xs" title="最高/最低気温 (℃)">
-        <span className="text-red-500 font-medium">
-          {day.tempMax !== null ? `${day.tempMax.toFixed(0)}\u00B0` : '--'}
+      <div className="flex justify-center my-1" title="天気">
+        <WeatherIcon code={day.weatherCode} size={26} className="text-ink-muted" />
+      </div>
+      <div className="nums text-xs" title="最高/最低気温 (℃)">
+        <span className="text-hot font-semibold">
+          {day.tempMax !== null ? `${day.tempMax.toFixed(0)}°` : '--'}
         </span>
-        <span className="text-slate-400 mx-0.5">/</span>
-        <span className="text-blue-500 font-medium">
-          {day.tempMin !== null ? `${day.tempMin.toFixed(0)}\u00B0` : '--'}
+        <span className="text-ink-subtle mx-0.5">/</span>
+        <span className="text-cool font-semibold">
+          {day.tempMin !== null ? `${day.tempMin.toFixed(0)}°` : '--'}
         </span>
       </div>
       {day.precipProbMax !== null && (
         <div
-          className={`text-xs mt-0.5 font-medium ${
-            day.precipProbMax >= 50
-              ? 'text-blue-600 dark:text-blue-400'
-              : 'text-slate-400'
+          className={`nums inline-flex items-center justify-center gap-0.5 text-xs mt-0.5 font-medium ${
+            day.precipProbMax >= 50 ? 'text-cool' : 'text-ink-subtle'
           }`}
           title={`最大降水確率 ${day.precipProbMax}%`}
         >
-          ☔{day.precipProbMax}%
+          <UmbrellaIcon size={11} /> {day.precipProbMax}%
         </div>
       )}
       {day.precipSum !== null && day.precipSum > 0 && (
-        <div className="text-[10px] text-blue-500" title={`1日の合計降水量 ${day.precipSum.toFixed(1)} mm`}>
+        <div className="nums text-[10px] text-cool" title={`1日の合計降水量 ${day.precipSum.toFixed(1)} mm`}>
           {day.precipSum.toFixed(0)}mm
         </div>
       )}

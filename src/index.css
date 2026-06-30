@@ -2,11 +2,171 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* ──────────────────────────────────────────────────────────────
+   TenkiTracker — Atmospheric Sky design tokens
+   方針: 寒色の「大気」ニュートラルを基調に、暖色の「日の出」アクセント1色。
+   色は semantic 名で参照する (bg-canvas / text-ink / bg-accent ...)。
+   light/dark は別スケールで定義し、明度を機械反転しない。
+   ────────────────────────────────────────────────────────────── */
+
+/* semantic 層: 実値は :root / .dark の runtime 変数を参照 (inline で変数のまま出力) */
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-sunk: var(--surface-sunk);
+
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-ink-subtle: var(--ink-subtle);
+
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-ink: var(--accent-ink);
+
+  /* 気象・頭痛リスクの機能色 (情報を運ぶ色。装飾ではない) */
+  --color-safe: var(--safe);
+  --color-low: var(--low);
+  --color-caution: var(--caution);
+  --color-warn: var(--warn);
+  --color-danger: var(--danger);
+  --color-safe-soft: var(--safe-soft);
+  --color-low-soft: var(--low-soft);
+  --color-caution-soft: var(--caution-soft);
+  --color-warn-soft: var(--warn-soft);
+  --color-danger-soft: var(--danger-soft);
+
+  /* 気温・降水の慣用色 (暖=最高気温, 寒=最低気温/降水)。情報を運ぶ色 */
+  --color-hot: var(--hot);
+  --color-cool: var(--cool);
+  --color-cool-soft: var(--cool-soft);
+}
+
+/* primitive 層: 静的トークン (font / radius / shadow / easing) */
+@theme {
+  --font-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --font-body: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+
+  --radius-sm: 0.5rem;   /* 8px  — タグ・小要素 */
+  --radius-md: 0.875rem; /* 14px — タイル */
+  --radius-lg: 1.25rem;  /* 20px — カード */
+  --radius-xl: 1.75rem;  /* 28px — モーダル */
+
+  /* 多層ソフトシャドウ。寒色をわずかに乗せて大気の奥行きを出す */
+  --shadow-sm: 0 1px 2px oklch(0.45 0.05 255 / 0.07);
+  --shadow-md: 0 1px 2px oklch(0.45 0.05 255 / 0.05),
+               0 6px 16px oklch(0.42 0.06 258 / 0.08);
+  --shadow-lg: 0 2px 6px oklch(0.42 0.06 258 / 0.08),
+               0 16px 40px oklch(0.40 0.07 260 / 0.14);
+
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+/* ── Light: 昼の大気 (寒色オフホワイト + 蜂蜜色アクセント) ── */
 :root {
-  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --canvas: oklch(0.975 0.012 240);
+  --surface: oklch(1 0 0);
+  --surface-raised: oklch(1 0 0);
+  --surface-sunk: oklch(0.965 0.012 240);
+
+  --ink: oklch(0.27 0.025 255);
+  --ink-muted: oklch(0.46 0.022 252);    /* 白地で ~4.9:1 (AA) */
+  --ink-subtle: oklch(0.48 0.02 250);    /* 微細テキストも AA を満たす濃さに */
+
+  --line: oklch(0.91 0.012 245);
+  --line-strong: oklch(0.85 0.015 245);
+
+  --accent: oklch(0.74 0.135 72);        /* honey / sunrise (面・塗り用) */
+  --accent-strong: oklch(0.56 0.13 58);  /* 文字/アイコン用に濃いめ (白地で可読) */
+  --accent-soft: oklch(0.94 0.045 78);
+  --accent-ink: oklch(0.30 0.06 60);     /* アクセント面の上の文字 (暖色ダーク) */
+
+  --safe: oklch(0.70 0.135 152);
+  --low: oklch(0.74 0.13 158);
+  --caution: oklch(0.78 0.135 88);
+  --warn: oklch(0.70 0.155 52);
+  --danger: oklch(0.60 0.195 26);
+  --safe-soft: oklch(0.95 0.035 152);
+  --low-soft: oklch(0.95 0.04 158);
+  --caution-soft: oklch(0.95 0.05 90);
+  --warn-soft: oklch(0.95 0.045 60);
+  --danger-soft: oklch(0.95 0.035 22);
+
+  --hot: oklch(0.55 0.17 30);   /* 文字利用が多いので白地で可読に */
+  --cool: oklch(0.52 0.13 245);
+  --cool-soft: oklch(0.94 0.04 240);
+}
+
+/* ── Dark: 薄明の大気 (twilight blue) ── */
+.dark {
+  --canvas: oklch(0.205 0.025 258);
+  --surface: oklch(0.255 0.028 258);
+  --surface-raised: oklch(0.295 0.03 258);
+  --surface-sunk: oklch(0.225 0.026 258);
+
+  --ink: oklch(0.95 0.01 250);
+  --ink-muted: oklch(0.76 0.018 250);
+  --ink-subtle: oklch(0.68 0.02 252);  /* 暗地で微細テキストも ~4.5:1 に */
+
+  --line: oklch(0.34 0.022 256);
+  --line-strong: oklch(0.44 0.026 256);
+
+  --accent: oklch(0.78 0.135 74);
+  --accent-strong: oklch(0.72 0.14 68);
+  --accent-soft: oklch(0.34 0.06 70);
+  --accent-ink: oklch(0.22 0.04 60);
+
+  --safe: oklch(0.74 0.13 152);
+  --low: oklch(0.76 0.125 158);
+  --caution: oklch(0.80 0.13 88);
+  --warn: oklch(0.74 0.15 54);
+  --danger: oklch(0.68 0.18 26);
+  --safe-soft: oklch(0.32 0.05 152);
+  --low-soft: oklch(0.33 0.05 158);
+  --caution-soft: oklch(0.35 0.06 90);
+  --warn-soft: oklch(0.34 0.07 52);
+  --danger-soft: oklch(0.33 0.08 24);
+
+  --hot: oklch(0.68 0.17 30);
+  --cool: oklch(0.70 0.12 242);
+  --cool-soft: oklch(0.33 0.05 245);
+}
+
+:root {
+  font-family: var(--font-body);
+  color-scheme: light;
+}
+.dark {
+  color-scheme: dark;
 }
 
 body {
   margin: 0;
   min-height: 100dvh;
+}
+
+/* 見出し・ブランドは display フォント */
+.font-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
+}
+
+/* 数値の桁揃え (ダッシュボード/表で多用) */
+.nums {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

@@ -1,92 +1,115 @@
 import type { HeadacheRiskLevel } from './types'
+import { getNotifState, setNotifState, passesCooldown } from './notif-store'
+import { buildNotification } from './notif-content'
 
-const STORAGE_KEY = 'tenki-notif-state'
-const COOLDOWN_MS = 3 * 3_600_000 // 3 hours between same-level notifications
+/**
+ * 通知 (ページ側)。
+ * - アプリを開いている間: ここで new Notification() を出す。
+ * - 閉じている間: Service Worker の periodicsync (sw.ts) が出す。
+ * 有効フラグ/クールダウンは notif-store (IndexedDB) で SW と共有する。
+ */
 
-interface NotifState {
-  enabled: boolean
-  lastLevel: HeadacheRiskLevel | null
-  lastNotifAt: number
+const PERIODIC_TAG = 'headache-check'
+const MIN_INTERVAL_MS = 60 * 60 * 1000 // 1時間 (実際の頻度はブラウザが決定。これは下限希望値)
+
+interface PeriodicSyncManager {
+  register(tag: string, options: { minInterval: number }): Promise<void>
+  unregister(tag: string): Promise<void>
+  getTags(): Promise<string[]>
 }
 
-function loadState(): NotifState {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) return JSON.parse(raw)
-  } catch { /* use default */ }
-  return { enabled: false, lastLevel: null, lastNotifAt: 0 }
+function getPeriodicSync(reg: ServiceWorkerRegistration): PeriodicSyncManager | undefined {
+  return (reg as unknown as { periodicSync?: PeriodicSyncManager }).periodicSync
 }
 
-function saveState(state: NotifState): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+/** このブラウザが「閉じていても通知」(Periodic Background Sync) に対応しているか */
+export function supportsBackgroundNotifications(): boolean {
+  return (
+    typeof navigator !== 'undefined' &&
+    'serviceWorker' in navigator &&
+    'PeriodicSyncManager' in window
+  )
 }
 
-export function isNotificationEnabled(): boolean {
-  return loadState().enabled
+export async function isNotificationEnabled(): Promise<boolean> {
+  return (await getNotifState()).enabled
 }
 
 export async function enableNotifications(): Promise<boolean> {
   if (!('Notification' in window)) return false
-  const perm = await Notification.requestPermission()
-  const granted = perm === 'granted'
-  const state = loadState()
-  state.enabled = granted
-  saveState(state)
+  const granted = (await Notification.requestPermission()) === 'granted'
+  await setNotifState({ enabled: granted })
+  if (granted) await registerPeriodicSync()
   return granted
 }
 
-export function disableNotifications(): void {
-  const state = loadState()
-  state.enabled = false
-  saveState(state)
+export async function disableNotifications(): Promise<void> {
+  await setNotifState({ enabled: false })
+  await unregisterPeriodicSync()
 }
 
-export function shouldNotify(level: HeadacheRiskLevel): boolean {
-  if (level === 'safe' || level === 'low') return false
-  const state = loadState()
-  if (!state.enabled) return false
-  if ('Notification' in window && Notification.permission !== 'granted') return false
-
-  const now = Date.now()
-  // Don't re-notify for same or lower level within cooldown
-  const severity: Record<HeadacheRiskLevel, number> = {
-    safe: 0, low: 1, moderate: 2, high: 3, critical: 4,
-  }
-  if (
-    state.lastLevel &&
-    severity[level] <= severity[state.lastLevel] &&
-    now - state.lastNotifAt < COOLDOWN_MS
-  ) {
-    return false
-  }
-
-  return true
-}
-
-export function sendHeadacheNotification(
+/** リスク評価を受けて、必要なら通知を出す (クールダウンは notif-store で判定) */
+export async function maybeNotify(
   level: HeadacheRiskLevel,
   label: string,
   summary: string,
-): void {
-  if (!shouldNotify(level)) return
+): Promise<void> {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return
+  const state = await getNotifState()
+  const now = Date.now()
+  if (!passesCooldown(state, level, now)) return
 
-  const icons: Record<HeadacheRiskLevel, string> = {
-    safe: '', low: '', moderate: '\u26A0\uFE0F', high: '\u{1F6A8}', critical: '\u{1F198}',
-  }
-
-  const notif = new Notification(`${icons[level]} TenkiTracker: 頭痛リスク${label}`, {
-    body: summary,
-    icon: '/weather-tracker/icon-192.svg',
-    tag: 'headache-risk',
+  const content = buildNotification(level, label, summary)
+  const notif = new Notification(content.title, {
+    body: content.body,
+    icon: content.icon,
+    tag: content.tag,
   })
-
   notif.onclick = () => {
     window.focus()
     notif.close()
   }
+  await setNotifState({ lastLevel: level, lastNotifAt: now })
+}
 
-  const state = loadState()
-  state.lastLevel = level
-  state.lastNotifAt = Date.now()
-  saveState(state)
+/** 端末でテスト通知を出す (SW経由 = 閉じている時と同じ経路で確認できる) */
+export async function sendTestNotification(): Promise<boolean> {
+  if (!('serviceWorker' in navigator)) return false
+  if (!('Notification' in window) || Notification.permission !== 'granted') return false
+  const reg = await navigator.serviceWorker.ready
+  reg.active?.postMessage('test-notification')
+  return true
+}
+
+async function registerPeriodicSync(): Promise<void> {
+  if (!('serviceWorker' in navigator)) return
+  try {
+    const reg = await navigator.serviceWorker.ready
+    const periodicSync = getPeriodicSync(reg)
+    if (!periodicSync) return // Safari等は非対応。開いている時の通知のみ。
+    try {
+      const status = await navigator.permissions.query({
+        name: 'periodic-background-sync' as PermissionName,
+      })
+      if (status.state === 'denied') return
+    } catch {
+      // permissions.query が未対応のブラウザもある。register を直接試す。
+    }
+    const tags = await periodicSync.getTags()
+    if (!tags.includes(PERIODIC_TAG)) {
+      await periodicSync.register(PERIODIC_TAG, { minInterval: MIN_INTERVAL_MS })
+    }
+  } catch {
+    // 未対応/未インストールでは黙って無視 (開いている時の通知にフォールバック)
+  }
+}
+
+async function unregisterPeriodicSync(): Promise<void> {
+  if (!('serviceWorker' in navigator)) return
+  try {
+    const reg = await navigator.serviceWorker.ready
+    await getPeriodicSync(reg)?.unregister(PERIODIC_TAG)
+  } catch {
+    // noop
+  }
 }

@@ -20,6 +20,16 @@ import type {
 import { calculateHeadacheRisk } from '../lib/headache-model'
 import { addDiaryEntry } from '../lib/diary'
 import { InfoTooltip } from './InfoTooltip'
+import { StatusDot } from './icons'
+
+/** リスクレベル → 状態ドットの色クラス (絵文字の色付き丸の置き換え) */
+const LEVEL_DOT: Record<HeadacheRiskLevel, string> = {
+  safe: 'bg-safe',
+  low: 'bg-low',
+  moderate: 'bg-caution',
+  high: 'bg-warn',
+  critical: 'bg-danger',
+}
 
 interface HeadacheRiskPanelProps {
   models: ModelForecast[]
@@ -31,35 +41,44 @@ const LEVEL_STYLES: Record<
   { bg: string; badge: string; ring: string; icon: string }
 > = {
   safe: {
-    bg: 'bg-white dark:bg-slate-800',
-    badge: 'bg-green-500 text-white',
+    bg: 'bg-surface',
+    badge: 'bg-safe text-white',
     ring: '',
-    icon: '\u2705',
+    icon: '✅',
   },
   low: {
-    bg: 'bg-emerald-50 dark:bg-emerald-900/20',
-    badge: 'bg-emerald-500 text-white',
+    bg: 'bg-low-soft',
+    badge: 'bg-low text-white',
     ring: '',
     icon: '\u{1F7E2}',
   },
   moderate: {
-    bg: 'bg-yellow-50 dark:bg-yellow-900/20',
-    badge: 'bg-yellow-500 text-white',
-    ring: 'ring-1 ring-yellow-300 dark:ring-yellow-700',
+    bg: 'bg-caution-soft',
+    badge: 'bg-caution text-[oklch(0.28_0.04_85)]',
+    ring: 'ring-1 ring-caution/40',
     icon: '\u{1F7E1}',
   },
   high: {
-    bg: 'bg-orange-50 dark:bg-orange-900/20',
-    badge: 'bg-orange-500 text-white',
-    ring: 'ring-2 ring-orange-400 dark:ring-orange-600',
+    bg: 'bg-warn-soft',
+    badge: 'bg-warn text-white',
+    ring: 'ring-1 ring-warn/45',
     icon: '\u{1F7E0}',
   },
   critical: {
-    bg: 'bg-red-50 dark:bg-red-900/20',
-    badge: 'bg-red-600 text-white',
-    ring: 'ring-2 ring-red-400 dark:ring-red-600',
+    bg: 'bg-danger-soft',
+    badge: 'bg-danger text-white',
+    ring: 'ring-2 ring-danger/45',
     icon: '\u{1F534}',
   },
+}
+
+/** スコア帯 → トークン色クラス (ゲージ・因子バー共通) */
+function scoreBarClass(score: number): string {
+  if (score >= 76) return 'bg-danger'
+  if (score >= 56) return 'bg-warn'
+  if (score >= 36) return 'bg-caution'
+  if (score >= 16) return 'bg-low'
+  return 'bg-safe'
 }
 
 /** 因子IDごとの「誰でもわかる」平易な説明。論文ベース閾値を日常語に翻訳 */
@@ -104,7 +123,7 @@ const LEVEL_DEFINITIONS: Array<{
     label: '安全',
     icon: '✅',
     action: '通常どおりの活動で問題なし。',
-    bgClass: 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800',
+    bgClass: 'bg-safe-soft border-safe/30',
   },
   {
     level: 'low',
@@ -112,7 +131,7 @@ const LEVEL_DEFINITIONS: Array<{
     label: 'やや注意',
     icon: '🟢',
     action: '敏感な方は水分補給・睡眠を意識。',
-    bgClass: 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800',
+    bgClass: 'bg-low-soft border-low/30',
   },
   {
     level: 'moderate',
@@ -120,7 +139,7 @@ const LEVEL_DEFINITIONS: Array<{
     label: '注意',
     icon: '🟡',
     action: '鎮痛薬を携帯。無理な予定は控えめに。',
-    bgClass: 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800',
+    bgClass: 'bg-caution-soft border-caution/30',
   },
   {
     level: 'high',
@@ -128,7 +147,7 @@ const LEVEL_DEFINITIONS: Array<{
     label: '警戒',
     icon: '🟠',
     action: '発症前の予防服薬を検討。早めの休息を。',
-    bgClass: 'bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800',
+    bgClass: 'bg-warn-soft border-warn/30',
   },
   {
     level: 'critical',
@@ -136,7 +155,7 @@ const LEVEL_DEFINITIONS: Array<{
     label: '厳重警戒',
     icon: '🔴',
     action: '屋内待機を推奨。重要な予定は再調整を検討。',
-    bgClass: 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800',
+    bgClass: 'bg-danger-soft border-danger/30',
   },
 ]
 
@@ -190,27 +209,28 @@ export function HeadacheRiskPanel({ models, ensemble }: HeadacheRiskPanelProps) 
   }, [risk.overallScore, currentHour, pressureChange3h])
 
   return (
-    <div className={`rounded-xl p-4 shadow-sm ${style.bg} ${style.ring}`}>
+    <div className={`rounded-lg p-4 shadow-md ${style.bg} ${style.ring}`}>
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
-        <h3 className="inline-flex items-center gap-1 text-sm font-medium text-slate-500 dark:text-slate-400">
+        <h3 className="inline-flex items-center gap-1 text-xs font-medium tracking-wide text-ink-muted">
           頭痛リスク予測
           <button
             type="button"
             onClick={() => setShowInfoModal(true)}
             aria-label="スコアとレベルの定義を表示"
-            className="inline-flex items-center justify-center w-4 h-4 rounded-full border border-current opacity-60 hover:opacity-100"
+            className="inline-flex items-center justify-center w-4 h-4 rounded-full border border-current opacity-60 hover:opacity-100 transition-opacity"
           >
             <span className="text-[9px] font-bold leading-none">i</span>
           </button>
         </h3>
         <div className="flex items-center gap-2">
-          <span className="inline-flex items-center gap-1 text-xs text-slate-400 dark:text-slate-500">
-            信頼度 {Math.round(risk.confidence * 100)}%
+          <span className="inline-flex items-center gap-1 text-xs text-ink-subtle">
+            <span className="nums">信頼度 {Math.round(risk.confidence * 100)}%</span>
             <InfoTooltip term="headacheConfidence" />
           </span>
-          <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${style.badge}`}>
-            {style.icon} {risk.label}
+          <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full ${style.badge}`}>
+            <StatusDot className="bg-current opacity-70" size={6} />
+            {risk.label}
           </span>
         </div>
       </div>
@@ -219,33 +239,27 @@ export function HeadacheRiskPanel({ models, ensemble }: HeadacheRiskPanelProps) 
       <div className="mb-3">
         <div className="flex items-center gap-3">
           <div className="flex-1">
-            <div className="h-3 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden relative">
+            <div className="h-3 rounded-full bg-surface-sunk overflow-hidden relative">
               {/* Threshold markers */}
               {[16, 36, 56, 76].map(t => (
                 <div
                   key={t}
-                  className="absolute top-0 bottom-0 w-px bg-slate-400/40 dark:bg-slate-500/40"
+                  className="absolute top-0 bottom-0 w-px bg-ink/15"
                   style={{ left: `${t}%` }}
                 />
               ))}
               <div
-                className={`h-full rounded-full transition-all duration-700 ${
-                  risk.overallScore >= 76 ? 'bg-red-500' :
-                  risk.overallScore >= 56 ? 'bg-orange-500' :
-                  risk.overallScore >= 36 ? 'bg-yellow-500' :
-                  risk.overallScore >= 16 ? 'bg-emerald-500' :
-                  'bg-green-500'
-                }`}
+                className={`h-full rounded-full transition-all duration-700 ease-out ${scoreBarClass(risk.overallScore)}`}
                 style={{ width: `${risk.overallScore}%` }}
               />
             </div>
           </div>
-          <span className="inline-flex items-baseline text-xl font-bold min-w-[3ch] text-right">
+          <span className="inline-flex items-baseline font-display nums text-2xl font-bold min-w-[3ch] text-right text-ink">
             {risk.overallScore}
-            <span className="text-[10px] font-normal text-slate-400 ml-0.5">/100</span>
+            <span className="text-[10px] font-normal text-ink-subtle ml-0.5">/100</span>
           </span>
         </div>
-        <div className="flex justify-between mt-1 text-[9px] text-slate-400 dark:text-slate-500">
+        <div className="nums flex justify-between mt-1 text-[9px] text-ink-subtle">
           <span>0 安全</span>
           <span>36 注意</span>
           <span>56 警戒</span>
@@ -254,13 +268,13 @@ export function HeadacheRiskPanel({ models, ensemble }: HeadacheRiskPanelProps) 
       </div>
 
       {/* Summary */}
-      <p className="text-sm mb-2">{risk.summary}</p>
+      <p className="text-sm mb-2 text-ink">{risk.summary}</p>
 
       {/* Advice */}
       <div className="space-y-1 mb-3">
         {risk.advice.map((a, i) => (
-          <p key={i} className="text-xs text-slate-500 dark:text-slate-400 flex gap-1.5">
-            <span className="shrink-0">{'\u{1F4A1}'}</span>
+          <p key={i} className="text-xs text-ink-muted flex gap-2 items-start">
+            <StatusDot className="bg-accent mt-[5px]" size={5} />
             {a}
           </p>
         ))}
@@ -270,10 +284,10 @@ export function HeadacheRiskPanel({ models, ensemble }: HeadacheRiskPanelProps) 
       <HourlyMiniTimeline hourlyRisk={risk.hourlyRisk} />
 
       {/* Quick log button */}
-      <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-700">
+      <div className="mt-3 pt-3 border-t border-line">
         <div className="flex items-center justify-between">
-          <span className={`text-xs ${diaryError ? 'text-red-500' : 'text-slate-500 dark:text-slate-400'}`}>
-            {diaryError ? '\u274C 保存に失敗しました' : diaryLogged ? '\u2705 記録しました' : '今、頭痛がありますか？'}
+          <span className={`text-xs ${diaryError ? 'text-danger' : 'text-ink-muted'}`}>
+            {diaryError ? '保存に失敗しました' : diaryLogged ? '記録しました' : '今、頭痛がありますか？'}
           </span>
           {!diaryLogged && (
             <div className="flex gap-1">
@@ -281,7 +295,7 @@ export function HeadacheRiskPanel({ models, ensemble }: HeadacheRiskPanelProps) 
                 <button
                   key={sev}
                   onClick={() => logHeadache(sev)}
-                  className="w-7 h-7 rounded-full text-xs font-medium bg-slate-100 dark:bg-slate-700 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors"
+                  className="nums w-7 h-7 rounded-full text-xs font-semibold bg-surface-sunk text-ink hover:bg-accent-soft hover:text-accent-strong transition-colors duration-200 ease-out"
                   title={`重症度 ${sev}`}
                 >
                   {sev}
@@ -290,7 +304,7 @@ export function HeadacheRiskPanel({ models, ensemble }: HeadacheRiskPanelProps) 
             </div>
           )}
         </div>
-        <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">
+        <p className="text-[10px] text-ink-subtle mt-1">
           1(軽い)〜5(非常に辛い) をタップして記録
         </p>
       </div>
@@ -298,7 +312,7 @@ export function HeadacheRiskPanel({ models, ensemble }: HeadacheRiskPanelProps) 
       {/* Detail toggle */}
       <button
         onClick={() => setShowDetail(v => !v)}
-        className="mt-2 w-full text-xs text-blue-500 dark:text-blue-400 hover:underline"
+        className="mt-2 w-full text-xs text-accent-strong hover:underline"
       >
         {showDetail ? '詳細を閉じる' : '因子の詳細を見る'}
       </button>
@@ -319,49 +333,45 @@ export function HeadacheRiskPanel({ models, ensemble }: HeadacheRiskPanelProps) 
 function FactorDetail({ factors }: { factors: HeadacheFactor[] }) {
   return (
     <div className="mt-3 space-y-3">
-      <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+      <p className="text-[11px] text-ink-muted leading-relaxed">
         各因子は医学論文の閾値に基づき0-100で採点。下の重み(%)で合算後、
         3因子以上が同時に高ければ1.1-1.2倍の複合補正を適用して最終スコアを算出。
       </p>
       {factors.map(f => {
         const plain = FACTOR_PLAIN_INFO[f.id]
         return (
-          <div key={f.id} className="rounded-lg bg-slate-50 dark:bg-slate-700/40 p-2 space-y-1">
+          <div key={f.id} className="rounded-md bg-surface-sunk p-2 space-y-1">
             <div className="flex items-center gap-2 text-xs">
-              <div className="w-24 truncate font-medium" title={f.name}>
+              <div className="w-24 truncate font-medium text-ink" title={f.name}>
                 {f.name}
               </div>
-              <div className="flex-1 h-2 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
+              <div className="flex-1 h-2 rounded-full bg-line overflow-hidden">
                 <div
-                  className={`h-full rounded-full ${
-                    f.score >= 70 ? 'bg-red-400' :
-                    f.score >= 40 ? 'bg-yellow-400' :
-                    'bg-green-400'
-                  }`}
+                  className={`h-full rounded-full ${scoreBarClass(f.score)}`}
                   style={{ width: `${f.score}%` }}
                 />
               </div>
               <span
-                className="w-10 text-right font-medium"
+                className="nums w-10 text-right font-medium text-ink"
                 title="この因子のスコア (0-100)"
               >
                 {f.score}/100
               </span>
               <span
-                className="w-10 text-right text-slate-400 text-[10px]"
+                className="nums w-10 text-right text-ink-subtle text-[10px]"
                 title={`総合スコアへの寄与度。合計100%`}
               >
                 重み{(f.weight * 100).toFixed(0)}%
               </span>
             </div>
             {f.description !== 'データ不足' && (
-              <div className="text-[10px] text-slate-500 dark:text-slate-400 pl-[6.5rem]">
+              <div className="text-[10px] text-ink-muted pl-[6.5rem]">
                 現在値: {f.description}
               </div>
             )}
             {plain && (
-              <div className="text-[10px] text-slate-500 dark:text-slate-400 pl-[6.5rem] space-y-0.5">
-                <p>ℹ️ {plain.meaning}</p>
+              <div className="text-[10px] text-ink-muted pl-[6.5rem] space-y-0.5">
+                <p>{plain.meaning}</p>
                 <p className="opacity-80">基準: {plain.threshold}</p>
               </div>
             )}
@@ -377,14 +387,14 @@ function FactorDetail({ factors }: { factors: HeadacheFactor[] }) {
 function ScoreDefinitionModal({ onClose }: { onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative w-full max-w-md max-h-[85vh] overflow-y-auto bg-white dark:bg-slate-800 rounded-2xl shadow-xl p-5">
+      <div className="absolute inset-0 bg-ink/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full max-w-md max-h-[85vh] overflow-y-auto bg-surface-raised rounded-xl shadow-lg p-5">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg font-bold">頭痛リスクスコアとは</h2>
+          <h2 className="font-display text-lg font-bold text-ink">頭痛リスクスコアとは</h2>
           <button
             onClick={onClose}
             aria-label="閉じる"
-            className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700"
+            className="p-1 rounded-md text-ink-muted hover:bg-surface-sunk hover:text-ink transition-colors duration-200 ease-out"
           >
             <span className="text-xl leading-none">×</span>
           </button>
@@ -392,34 +402,34 @@ function ScoreDefinitionModal({ onClose }: { onClose: () => void }) {
 
         <div className="space-y-4 text-sm">
           <section>
-            <h3 className="font-semibold mb-1">📊 スコアの意味</h3>
-            <p className="text-slate-600 dark:text-slate-300 leading-relaxed">
+            <h3 className="font-semibold mb-1 text-ink">スコアの意味</h3>
+            <p className="text-ink-muted leading-relaxed">
               0-100の数値で、数字が大きいほど「気象が原因で頭痛が起きやすい状態」を示します。
               単一要因ではなく、6つの気象因子を医学論文の閾値に基づき加重平均したものです。
             </p>
           </section>
 
           <section>
-            <h3 className="font-semibold mb-2">🚦 5段階の意味と推奨行動</h3>
+            <h3 className="font-semibold mb-2 text-ink">5段階の意味と推奨行動</h3>
             <div className="space-y-2">
               {LEVEL_DEFINITIONS.map(d => (
-                <div key={d.level} className={`rounded-lg border p-2 ${d.bgClass}`}>
+                <div key={d.level} className={`rounded-md border p-2 ${d.bgClass}`}>
                   <div className="flex items-center gap-2 mb-1">
-                    <span>{d.icon}</span>
-                    <span className="font-bold text-sm">{d.label}</span>
-                    <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">
+                    <StatusDot className={LEVEL_DOT[d.level]} />
+                    <span className="font-bold text-sm text-ink">{d.label}</span>
+                    <span className="nums text-xs text-ink-muted">
                       スコア {d.range}
                     </span>
                   </div>
-                  <p className="text-xs text-slate-600 dark:text-slate-300">{d.action}</p>
+                  <p className="text-xs text-ink-muted">{d.action}</p>
                 </div>
               ))}
             </div>
           </section>
 
           <section>
-            <h3 className="font-semibold mb-1">🔬 評価している6因子</h3>
-            <ul className="list-disc pl-5 space-y-1 text-xs text-slate-600 dark:text-slate-300">
+            <h3 className="font-semibold mb-1 text-ink">評価している6因子</h3>
+            <ul className="list-disc pl-5 space-y-1 text-xs text-ink-muted">
               <li>気圧変化率 (重み35%): 短時間の気圧低下</li>
               <li>絶対気圧 (8%): 現在の気圧の低さそのもの</li>
               <li>気温変化 (18%): 半日〜1日の気温変動</li>
@@ -427,14 +437,14 @@ function ScoreDefinitionModal({ onClose }: { onClose: () => void }) {
               <li>前線通過 (15%): 寒冷・温暖前線の接近</li>
               <li>モデル不確実性 (10%): 予報の確からしさ</li>
             </ul>
-            <p className="text-[10px] text-slate-400 mt-1">
+            <p className="text-[10px] text-ink-subtle mt-1">
               3因子以上が同時に高い場合は1.1-1.2倍の複合補正を適用。
             </p>
           </section>
 
           <section>
-            <h3 className="font-semibold mb-1">⚠️ 注意</h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+            <h3 className="font-semibold mb-1 text-ink">注意</h3>
+            <p className="text-xs text-ink-muted leading-relaxed">
               これは一般的な気象因子に基づく参考値です。個人差が大きいため、
               頭痛日記を記録して自分の傾向を把握することをおすすめします。
               医療行為の代わりにはなりません。
@@ -444,7 +454,7 @@ function ScoreDefinitionModal({ onClose }: { onClose: () => void }) {
 
         <button
           onClick={onClose}
-          className="mt-4 w-full py-2 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium"
+          className="mt-4 w-full py-2 rounded-md bg-accent text-accent-ink text-sm font-semibold hover:bg-accent-strong transition-colors duration-200 ease-out"
         >
           閉じる
         </button>
@@ -456,11 +466,11 @@ function ScoreDefinitionModal({ onClose }: { onClose: () => void }) {
 /* ── Hourly risk area chart (24h) ── */
 
 function riskColor(score: number): string {
-  if (score >= 76) return '#ef4444'
-  if (score >= 56) return '#f97316'
-  if (score >= 36) return '#eab308'
-  if (score >= 16) return '#10b981'
-  return '#22c55e'
+  if (score >= 76) return 'var(--danger)'
+  if (score >= 56) return 'var(--warn)'
+  if (score >= 36) return 'var(--caution)'
+  if (score >= 16) return 'var(--low)'
+  return 'var(--safe)'
 }
 
 function HourlyMiniTimeline({ hourlyRisk }: { hourlyRisk: HeadacheRiskResult['hourlyRisk'] }) {
@@ -479,19 +489,20 @@ function HourlyMiniTimeline({ hourlyRisk }: { hourlyRisk: HeadacheRiskResult['ho
 
   // Threshold zones for reference
   const thresholds = [
-    { y: 36, label: '注意', color: '#eab308' },
-    { y: 56, label: '警戒', color: '#f97316' },
+    { y: 36, label: '注意', color: 'var(--caution)' },
+    { y: 56, label: '警戒', color: 'var(--warn)' },
   ]
 
   return (
     <div>
       <div className="flex items-center justify-between mb-1">
-        <span className="inline-flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
+        <span className="inline-flex items-center gap-1 text-xs text-ink-muted">
           今後24時間のリスク推移
           <InfoTooltip term="headacheScore" />
         </span>
         {peak.score >= 36 && (
-          <span className="text-[11px] font-medium" style={{ color: riskColor(peak.score) }}>
+          <span className="nums inline-flex items-center gap-1 text-[11px] font-medium text-ink-muted">
+            <StatusDot className={scoreBarClass(peak.score)} size={7} />
             ピーク {peakHour}時 (スコア{peak.score})
           </span>
         )}
@@ -500,14 +511,14 @@ function HourlyMiniTimeline({ hourlyRisk }: { hourlyRisk: HeadacheRiskResult['ho
         <AreaChart data={data} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
           <defs>
             <linearGradient id="riskGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#f97316" stopOpacity={0.4} />
-              <stop offset="50%" stopColor="#eab308" stopOpacity={0.2} />
-              <stop offset="100%" stopColor="#22c55e" stopOpacity={0.05} />
+              <stop offset="0%" stopColor="var(--warn)" stopOpacity={0.38} />
+              <stop offset="50%" stopColor="var(--caution)" stopOpacity={0.20} />
+              <stop offset="100%" stopColor="var(--safe)" stopOpacity={0.05} />
             </linearGradient>
           </defs>
           <XAxis
             dataKey="hour"
-            tick={{ fontSize: 9, fill: '#94a3b8' }}
+            tick={{ fontSize: 9, fill: 'var(--ink-subtle)' }}
             tickLine={false}
             axisLine={false}
             interval={5}
@@ -515,7 +526,7 @@ function HourlyMiniTimeline({ hourlyRisk }: { hourlyRisk: HeadacheRiskResult['ho
           />
           <YAxis
             domain={[0, 100]}
-            tick={{ fontSize: 9, fill: '#94a3b8' }}
+            tick={{ fontSize: 9, fill: 'var(--ink-subtle)' }}
             ticks={[0, 36, 56, 76, 100]}
             axisLine={false}
             tickLine={false}
@@ -525,7 +536,7 @@ function HourlyMiniTimeline({ hourlyRisk }: { hourlyRisk: HeadacheRiskResult['ho
               value="スコア"
               angle={-90}
               position="insideLeft"
-              style={{ fontSize: 9, fill: '#94a3b8' }}
+              style={{ fontSize: 9, fill: 'var(--ink-subtle)' }}
             />
           </YAxis>
           {thresholds.map(t => (
@@ -534,7 +545,7 @@ function HourlyMiniTimeline({ hourlyRisk }: { hourlyRisk: HeadacheRiskResult['ho
               y={t.y}
               stroke={t.color}
               strokeDasharray="3 3"
-              strokeOpacity={0.4}
+              strokeOpacity={0.45}
               label={{
                 value: t.label,
                 fill: t.color,
@@ -545,12 +556,13 @@ function HourlyMiniTimeline({ hourlyRisk }: { hourlyRisk: HeadacheRiskResult['ho
           ))}
           <Tooltip
             contentStyle={{
-              backgroundColor: 'rgba(15, 23, 42, 0.9)',
-              border: 'none',
-              borderRadius: '8px',
-              color: '#e2e8f0',
+              backgroundColor: 'var(--surface-raised)',
+              border: '1px solid var(--line)',
+              borderRadius: '10px',
+              color: 'var(--ink)',
               fontSize: '11px',
               padding: '4px 8px',
+              boxShadow: 'var(--shadow-md)',
             }}
             formatter={(value) => [`スコア ${value}/100`, 'リスク']}
             labelFormatter={(v) => `${v}時`}
@@ -558,21 +570,21 @@ function HourlyMiniTimeline({ hourlyRisk }: { hourlyRisk: HeadacheRiskResult['ho
           <Area
             type="monotone"
             dataKey="score"
-            stroke="#f97316"
+            stroke="var(--warn)"
             strokeWidth={2}
             fill="url(#riskGrad)"
             dot={false}
-            activeDot={{ r: 3, fill: '#f97316' }}
+            activeDot={{ r: 3, fill: 'var(--warn)' }}
           />
         </AreaChart>
       </ResponsiveContainer>
-      <div className="flex items-center gap-3 text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">
+      <div className="flex items-center gap-3 text-[10px] text-ink-subtle mt-0.5">
         <span className="flex items-center gap-1">
-          <span className="inline-block w-4 h-0.5 bg-yellow-400 rounded" />
+          <span className="inline-block w-4 h-0.5 rounded bg-caution" />
           36 = 注意ライン
         </span>
         <span className="flex items-center gap-1">
-          <span className="inline-block w-4 h-0.5 bg-orange-400 rounded" />
+          <span className="inline-block w-4 h-0.5 rounded bg-warn" />
           56 = 警戒ライン
         </span>
       </div>

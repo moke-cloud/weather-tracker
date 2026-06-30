@@ -1,5 +1,7 @@
 import type { ModelForecast } from '../lib/types'
-import { weatherIcon, computeApparentTemperature } from '../lib/utils'
+import { computeApparentTemperature } from '../lib/utils'
+import { WeatherIcon } from './WeatherIcon'
+import { UmbrellaIcon, ThermometerIcon } from './icons'
 import { InfoTooltip } from './InfoTooltip'
 
 interface HourlySummaryProps {
@@ -27,10 +29,8 @@ export function HourlySummary({ models }: HourlySummaryProps) {
   )
 
   return (
-    <div className="rounded-xl bg-white dark:bg-slate-800 p-4 shadow-sm">
-      <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-3">
-        今後24時間の予報
-      </h3>
+    <div className="rounded-lg bg-surface p-4 shadow-md">
+      <h3 className="text-xs font-medium tracking-wide text-ink-muted mb-3">今後24時間の予報</h3>
       <div className="overflow-x-auto">
         <div className="flex gap-0 min-w-max">
           {hours.map((h, i) => {
@@ -39,22 +39,19 @@ export function HourlySummary({ models }: HourlySummaryProps) {
             const showLabel = i === 0 || hour % 3 === 0
 
             return (
-              <div
-                key={h.time}
-                className="flex flex-col items-center w-11 shrink-0"
-              >
+              <div key={h.time} className="flex flex-col items-center w-11 shrink-0">
                 {/* Time */}
-                <div className="text-[10px] text-slate-400 dark:text-slate-500 h-4">
+                <div className="nums text-[10px] text-ink-subtle h-4">
                   {showLabel ? `${hour}時` : ''}
                 </div>
 
                 {/* Weather icon */}
-                <div className="text-base leading-none my-0.5">
-                  {weatherIcon(h.weatherCode)}
+                <div className="my-0.5">
+                  <WeatherIcon code={h.weatherCode} date={new Date(h.time)} size={22} className="text-ink-muted" />
                 </div>
 
                 {/* Temperature */}
-                <div className="text-xs font-medium">
+                <div className="nums text-xs font-semibold text-ink">
                   {h.temperature !== null ? `${h.temperature.toFixed(0)}°C` : ''}
                 </div>
                 {(() => {
@@ -65,7 +62,7 @@ export function HourlySummary({ models }: HourlySummaryProps) {
                   if (Math.abs(feels - h.temperature) < 2) return null
                   return (
                     <div
-                      className="text-[9px] text-slate-400 dark:text-slate-500 -mt-0.5"
+                      className="nums text-[9px] text-ink-subtle -mt-0.5"
                       title={`体感 ${feels.toFixed(0)}℃ (気温${h.temperature.toFixed(0)}℃との差${(feels - h.temperature).toFixed(1)}℃)`}
                     >
                       (体感{feels.toFixed(0)}°)
@@ -75,17 +72,13 @@ export function HourlySummary({ models }: HourlySummaryProps) {
 
                 {/* Precipitation probability bar */}
                 <div
-                  className="w-5 h-10 bg-slate-100 dark:bg-slate-700 rounded-sm mt-1 relative overflow-hidden"
+                  className="w-5 h-10 bg-surface-sunk rounded-sm mt-1 relative overflow-hidden"
                   title={prob !== null ? `降水確率 ${prob}%` : ''}
                 >
                   {prob !== null && prob > 0 && (
                     <div
-                      className={`absolute bottom-0 w-full rounded-sm transition-all ${
-                        prob >= 60
-                          ? 'bg-blue-500'
-                          : prob >= 30
-                            ? 'bg-blue-400'
-                            : 'bg-blue-300'
+                      className={`absolute bottom-0 w-full rounded-sm transition-all duration-300 ease-out bg-cool ${
+                        prob >= 60 ? 'opacity-100' : prob >= 30 ? 'opacity-70' : 'opacity-45'
                       }`}
                       style={{ height: `${prob}%` }}
                     />
@@ -94,10 +87,8 @@ export function HourlySummary({ models }: HourlySummaryProps) {
 
                 {/* Probability text */}
                 <div
-                  className={`text-[10px] mt-0.5 font-medium ${
-                    prob !== null && prob >= 50
-                      ? 'text-blue-600 dark:text-blue-400'
-                      : 'text-slate-400 dark:text-slate-500'
+                  className={`nums text-[10px] mt-0.5 font-medium ${
+                    prob !== null && prob >= 50 ? 'text-cool' : 'text-ink-subtle'
                   }`}
                 >
                   {prob !== null ? `${prob}%` : '-'}
@@ -105,24 +96,22 @@ export function HourlySummary({ models }: HourlySummaryProps) {
 
                 {/* Precipitation amount */}
                 {h.precipitation !== null && h.precipitation > 0 && (
-                  <div className="text-[9px] text-blue-500">
-                    {h.precipitation.toFixed(1)}mm
-                  </div>
+                  <div className="nums text-[9px] text-cool">{h.precipitation.toFixed(1)}mm</div>
                 )}
               </div>
             )
           })}
         </div>
       </div>
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-[10px] text-slate-400 dark:text-slate-500">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-[10px] text-ink-subtle">
         <span className="inline-flex items-center gap-1">
-          🌡️ 気温 (℃)
+          <ThermometerIcon size={13} className="text-ink-subtle" /> 気温 (℃)
           <span className="opacity-75">/ カッコ内は</span>
           <span className="opacity-75">体感温度</span>
           <InfoTooltip term="apparentTemperature" />
         </span>
         <span className="inline-flex items-center gap-1">
-          🌧 降水確率 (%)
+          <UmbrellaIcon size={13} className="text-cool" /> 降水確率 (%)
           <InfoTooltip term="precipProbability" />
         </span>
         <span className="inline-flex items-center gap-1">

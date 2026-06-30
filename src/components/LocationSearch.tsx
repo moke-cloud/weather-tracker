@@ -4,6 +4,7 @@ import { fetchAmedasStations, findNearestStation } from '../lib/amedas'
 import { lookupPostalCode } from '../lib/postal-code'
 import { REGIONS, matchAddress, type AreaEntry } from '../lib/jp-areas'
 import type { Location } from '../lib/types'
+import { PinIcon } from './icons'
 
 interface LocationSearchProps {
   onAdd: (location: Location) => void
@@ -163,24 +164,29 @@ export function LocationSearch({ onAdd, onClose }: LocationSearchProps) {
     )
   }, [resolveAndAdd])
 
+  const inputCls =
+    'flex-1 px-3 py-2 rounded-md border border-line bg-surface-sunk text-ink text-sm placeholder:text-ink-subtle focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent'
+  const primaryBtn =
+    'px-4 py-2 bg-accent text-accent-ink rounded-md text-sm font-semibold hover:bg-accent-strong disabled:opacity-50 transition-colors duration-200 ease-out'
+
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-16 px-4">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative w-full max-w-md bg-white dark:bg-slate-800 rounded-2xl shadow-xl p-5 max-h-[80vh] overflow-y-auto">
-        <h2 className="text-lg font-bold mb-3">地点を追加</h2>
+      <div className="absolute inset-0 bg-ink/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full max-w-md bg-surface-raised rounded-xl shadow-lg p-5 max-h-[80vh] overflow-y-auto">
+        <h2 className="font-display text-lg font-bold text-ink mb-3">地点を追加</h2>
 
         {/* GPS Button */}
         <button
           onClick={handleGPS}
           disabled={gpsLoading}
-          className="w-full mb-3 px-4 py-2.5 rounded-lg border-2 border-dashed border-blue-300 dark:border-blue-700 text-blue-600 dark:text-blue-400 text-sm font-medium hover:bg-blue-50 dark:hover:bg-blue-900/30 disabled:opacity-50 transition-colors"
+          className="w-full mb-3 px-4 py-2.5 rounded-md border-2 border-dashed border-accent/50 text-accent-strong text-sm font-semibold hover:bg-accent-soft disabled:opacity-50 transition-colors duration-200 ease-out inline-flex items-center justify-center gap-1.5"
         >
-          {gpsLoading ? '取得中...' : '\u{1F4CD} 現在地から追加'}
+          {gpsLoading ? '取得中...' : <><PinIcon size={16} /> 現在地から追加</>}
         </button>
 
         {/* Postal code search */}
-        <div className="mb-3 p-3 rounded-lg bg-slate-50 dark:bg-slate-700/50">
-          <div className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">
+        <div className="mb-3 p-3 rounded-md bg-surface-sunk">
+          <div className="text-xs font-medium text-ink-muted mb-1.5">
             〒 郵便番号で検索
           </div>
           <div className="flex gap-2">
@@ -199,27 +205,23 @@ export function LocationSearch({ onAdd, onClose }: LocationSearchProps) {
               onKeyDown={e => e.key === 'Enter' && handlePostalSearch()}
               placeholder="例: 100-0001"
               maxLength={8}
-              className="flex-1 px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className={`nums ${inputCls}`}
             />
-            <button
-              onClick={handlePostalSearch}
-              disabled={postalSearching}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
-            >
+            <button onClick={handlePostalSearch} disabled={postalSearching} className={primaryBtn}>
               {postalSearching ? '...' : '検索'}
             </button>
           </div>
           {postalError && (
-            <p className="text-xs text-red-500 mt-1.5">{postalError}</p>
+            <p className="text-xs text-danger mt-1.5">{postalError}</p>
           )}
           {postalResult && (
             <button
               onClick={() => resolveAndAdd(postalResult.name, postalResult.lat, postalResult.lon, postalResult.label)}
-              className="w-full mt-2 text-left px-3 py-2 rounded-lg bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 text-sm transition-colors"
+              className="w-full mt-2 text-left px-3 py-2 rounded-md bg-accent-soft hover:bg-accent/25 text-sm transition-colors duration-200 ease-out"
             >
-              <span className="font-medium">{postalResult.name}</span>
-              <span className="text-slate-500 dark:text-slate-400 ml-2">{postalResult.label}</span>
-              <span className="text-xs text-slate-400 ml-2">{postalAddress}</span>
+              <span className="font-medium text-ink">{postalResult.name}</span>
+              <span className="text-ink-muted ml-2">{postalResult.label}</span>
+              <span className="text-xs text-ink-subtle ml-2">{postalAddress}</span>
             </button>
           )}
         </div>
@@ -228,20 +230,20 @@ export function LocationSearch({ onAdd, onClose }: LocationSearchProps) {
         <div className="flex gap-1 mb-3">
           <button
             onClick={() => setSearchMode('preset')}
-            className={`flex-1 py-1.5 text-xs rounded-lg font-medium transition-colors ${
+            className={`flex-1 py-1.5 text-xs rounded-md font-medium transition-colors duration-200 ease-out ${
               searchMode === 'preset'
-                ? 'bg-blue-600 text-white'
-                : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
+                ? 'bg-accent text-accent-ink'
+                : 'bg-surface-sunk text-ink-muted hover:bg-surface'
             }`}
           >
             地域から選ぶ
           </button>
           <button
             onClick={() => setSearchMode('search')}
-            className={`flex-1 py-1.5 text-xs rounded-lg font-medium transition-colors ${
+            className={`flex-1 py-1.5 text-xs rounded-md font-medium transition-colors duration-200 ease-out ${
               searchMode === 'search'
-                ? 'bg-blue-600 text-white'
-                : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
+                ? 'bg-accent text-accent-ink'
+                : 'bg-surface-sunk text-ink-muted hover:bg-surface'
             }`}
           >
             テキスト検索
@@ -258,14 +260,10 @@ export function LocationSearch({ onAdd, onClose }: LocationSearchProps) {
                 onChange={e => setQuery(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleSearch()}
                 placeholder="地名を入力 (例: 渋谷区, shizuoka)"
-                className="flex-1 px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className={inputCls}
                 autoFocus
               />
-              <button
-                onClick={handleSearch}
-                disabled={searching}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
-              >
+              <button onClick={handleSearch} disabled={searching} className={primaryBtn}>
                 {searching ? '...' : '検索'}
               </button>
             </div>
@@ -274,15 +272,15 @@ export function LocationSearch({ onAdd, onClose }: LocationSearchProps) {
                 <button
                   key={`${r.latitude}_${r.longitude}_${i}`}
                   onClick={() => resolveAndAdd(r.name, r.latitude, r.longitude, r.admin1)}
-                  className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-sm transition-colors"
+                  className="w-full text-left px-3 py-2 rounded-md hover:bg-surface-sunk text-sm transition-colors duration-200 ease-out"
                 >
-                  <span className="font-medium">{r.name}</span>
-                  {r.admin1 && <span className="text-slate-500 dark:text-slate-400 ml-2">{r.admin1}</span>}
-                  <span className="text-slate-400 dark:text-slate-500 ml-2 text-xs">{r.country}</span>
+                  <span className="font-medium text-ink">{r.name}</span>
+                  {r.admin1 && <span className="text-ink-muted ml-2">{r.admin1}</span>}
+                  <span className="text-ink-subtle ml-2 text-xs">{r.country}</span>
                 </button>
               ))}
               {results.length === 0 && !searching && query && (
-                <p className="text-sm text-slate-500 dark:text-slate-400 py-3 text-center">
+                <p className="text-sm text-ink-muted py-3 text-center">
                   結果なし
                 </p>
               )}
@@ -295,7 +293,7 @@ export function LocationSearch({ onAdd, onClose }: LocationSearchProps) {
           <div className="space-y-3">
             {REGIONS.map(region => (
               <div key={region.region}>
-                <h4 className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">
+                <h4 className="text-xs font-medium text-ink-muted mb-1.5">
                   {region.region}
                 </h4>
                 <div className="flex flex-wrap gap-1">
@@ -313,16 +311,16 @@ export function LocationSearch({ onAdd, onClose }: LocationSearchProps) {
                               resolveAndAdd(city.city, city.lat, city.lon, city.label)
                             }
                           }}
-                          className={`px-2.5 py-1 text-xs rounded-full transition-colors ${
+                          className={`px-2.5 py-1 text-xs rounded-full transition-colors duration-200 ease-out ${
                             isExpanded
-                              ? 'bg-blue-500 text-white'
+                              ? 'bg-accent text-accent-ink'
                               : hasWards
-                                ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/50'
-                                : 'bg-slate-100 dark:bg-slate-700 hover:bg-blue-100 dark:hover:bg-blue-900/40 hover:text-blue-700 dark:hover:text-blue-300'
+                                ? 'bg-accent-soft text-ink ring-1 ring-accent/30 hover:bg-accent/25'
+                                : 'bg-surface-sunk text-ink hover:bg-accent-soft'
                           }`}
                         >
                           {city.city}
-                          {hasWards && <span className="ml-0.5 text-[10px]">{isExpanded ? '\u25B2' : '\u25BC'}</span>}
+                          {hasWards && <span className="ml-0.5 text-[10px]">{isExpanded ? '▲' : '▼'}</span>}
                         </button>
 
                         {/* Ward expansion */}
@@ -330,7 +328,7 @@ export function LocationSearch({ onAdd, onClose }: LocationSearchProps) {
                           <div className="mt-1 ml-2 mb-2 flex flex-wrap gap-1">
                             <button
                               onClick={() => resolveAndAdd(city.city, city.lat, city.lon, city.label)}
-                              className="px-2 py-0.5 text-[11px] rounded-full bg-slate-200 dark:bg-slate-600 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors"
+                              className="px-2 py-0.5 text-[11px] rounded-full bg-line text-ink hover:bg-accent-soft hover:text-accent-strong transition-colors duration-200 ease-out"
                             >
                               {city.city}全体
                             </button>
@@ -343,7 +341,7 @@ export function LocationSearch({ onAdd, onClose }: LocationSearchProps) {
                                   ward.lon,
                                   ward.label
                                 )}
-                                className="px-2 py-0.5 text-[11px] rounded-full bg-slate-100 dark:bg-slate-700 hover:bg-blue-100 dark:hover:bg-blue-900/40 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
+                                className="px-2 py-0.5 text-[11px] rounded-full bg-surface-sunk text-ink hover:bg-accent-soft hover:text-accent-strong transition-colors duration-200 ease-out"
                               >
                                 {ward.name}
                               </button>
@@ -361,7 +359,7 @@ export function LocationSearch({ onAdd, onClose }: LocationSearchProps) {
 
         <button
           onClick={onClose}
-          className="mt-4 w-full py-2 text-sm text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300"
+          className="mt-4 w-full py-2 text-sm text-ink-muted hover:text-ink transition-colors duration-200 ease-out"
         >
           閉じる
         </button>

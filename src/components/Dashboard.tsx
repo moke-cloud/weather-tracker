@@ -19,8 +19,9 @@ import { fetchWeatherForLocation } from '../lib/weather-service'
 import type { Location } from '../lib/types'
 import { useTileOrder, TILE_LABELS, type TileId } from '../lib/tile-order'
 import { calculateHeadacheRisk } from '../lib/headache-model'
-import { shouldNotify, sendHeadacheNotification } from '../lib/notifications'
+import { maybeNotify } from '../lib/notifications'
 import { WeatherCard } from './WeatherCard'
+import { WeatherIcon } from './WeatherIcon'
 import { AirQualityCard } from './AirQualityCard'
 import { HeadacheRiskPanel } from './HeadacheRiskPanel'
 import { HeadacheDiary } from './HeadacheDiary'
@@ -80,11 +81,9 @@ export function Dashboard({ locations, onRemoveLocation }: DashboardProps) {
       const data = await fetchWeatherForLocation(location)
       setWeatherData(prev => new Map(prev).set(location.id, data))
 
-      // Check headache notification
+      // Check headache notification (開いている間の通知。閉じている間は sw.ts が担当)
       const risk = calculateHeadacheRisk(data.models, data.ensemble)
-      if (shouldNotify(risk.level)) {
-        sendHeadacheNotification(risk.level, risk.label, risk.summary)
-      }
+      await maybeNotify(risk.level, risk.label, risk.summary)
     } catch (err) {
       setErrors(prev =>
         new Map(prev).set(
@@ -174,9 +173,9 @@ export function Dashboard({ locations, onRemoveLocation }: DashboardProps) {
 
   if (locations.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 text-slate-500 dark:text-slate-400">
-        <div className="text-5xl mb-4">{'\u{1F324}\uFE0F'}</div>
-        <p className="text-lg mb-2">地点が登録されていません</p>
+      <div className="flex flex-col items-center justify-center py-24 text-ink-muted">
+        <WeatherIcon code={2} size={72} className="text-ink-subtle mb-4" />
+        <p className="font-display text-lg font-semibold text-ink mb-2">地点が登録されていません</p>
         <p className="text-sm">右上の「+ 地点追加」から観測地点を追加してください</p>
       </div>
     )
@@ -186,30 +185,30 @@ export function Dashboard({ locations, onRemoveLocation }: DashboardProps) {
   const refreshSec = Math.floor((nextRefreshIn % 60_000) / 1000)
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-10">
       {/* Toolbar */}
       <div className="flex items-center justify-between">
-        <div className="text-xs text-slate-400 dark:text-slate-500">
+        <div className="nums text-xs text-ink-subtle">
           次の自動更新: {refreshMin}:{String(refreshSec).padStart(2, '0')}
         </div>
         <div className="flex items-center gap-2">
           {editMode && (
             <button
               onClick={resetOrder}
-              className="text-xs px-3 py-1.5 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700"
+              className="text-xs px-3 py-1.5 rounded-md text-ink-muted hover:bg-surface-sunk transition-colors duration-200 ease-out"
             >
               初期順に戻す
             </button>
           )}
           <button
             onClick={() => setEditMode(v => !v)}
-            className={`text-xs px-3 py-1.5 rounded-lg transition-colors ${
+            className={`text-xs px-3 py-1.5 rounded-md transition-colors duration-200 ease-out ${
               editMode
-                ? 'bg-blue-500 text-white'
-                : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
+                ? 'bg-accent text-accent-ink font-semibold'
+                : 'bg-surface text-ink-muted hover:bg-surface-sunk border border-line'
             }`}
           >
-            {editMode ? '\u2705 完了' : '\u2630 並び替え'}
+            {editMode ? '完了' : '並び替え'}
           </button>
         </div>
       </div>
@@ -222,11 +221,11 @@ export function Dashboard({ locations, onRemoveLocation }: DashboardProps) {
         return (
           <section key={loc.id}>
             {/* Location header */}
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-xl font-bold">{loc.name}</h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-display text-2xl font-bold tracking-tight text-ink">{loc.name}</h2>
               <div className="flex items-center gap-2">
                 {data && (
-                  <span className="text-xs text-slate-400 dark:text-slate-500">
+                  <span className="nums text-xs text-ink-subtle">
                     {new Date(data.fetchedAt).toLocaleTimeString('ja-JP', {
                       hour: '2-digit',
                       minute: '2-digit',
@@ -237,13 +236,14 @@ export function Dashboard({ locations, onRemoveLocation }: DashboardProps) {
                 <button
                   onClick={() => fetchData(loc)}
                   disabled={isLoading}
-                  className="text-xs px-3 py-1 rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 disabled:opacity-50"
+                  className="text-xs px-3 py-1 rounded-md bg-surface border border-line text-ink-muted hover:bg-surface-sunk disabled:opacity-50 transition-colors duration-200 ease-out"
                 >
                   {isLoading ? '更新中...' : '\u21BB'}
                 </button>
                 <button
                   onClick={() => onRemoveLocation(loc.id)}
-                  className="text-xs px-2 py-1 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30"
+                  aria-label={`${loc.name} を削除`}
+                  className="text-xs px-2 py-1 rounded-md text-danger hover:bg-danger-soft transition-colors duration-200 ease-out"
                 >
                   {'\u2715'}
                 </button>
@@ -252,13 +252,13 @@ export function Dashboard({ locations, onRemoveLocation }: DashboardProps) {
 
             {isLoading && !data && (
               <div className="flex items-center justify-center py-12">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500" />
-                <span className="ml-3 text-slate-500 dark:text-slate-400">データ取得中...</span>
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" />
+                <span className="ml-3 text-ink-muted">データ取得中...</span>
               </div>
             )}
 
             {error && (
-              <div className="rounded-xl bg-red-50 dark:bg-red-900/20 p-4 text-red-700 dark:text-red-300 text-sm">
+              <div className="rounded-lg bg-danger-soft p-4 text-danger text-sm">
                 {error}
               </div>
             )}
@@ -324,13 +324,13 @@ function SortableTile({
           ref={setActivatorNodeRef}
           {...attributes}
           {...listeners}
-          className="flex items-center gap-2 px-3 py-1.5 mb-1 rounded-t-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 text-xs cursor-grab active:cursor-grabbing select-none touch-none"
+          className="flex items-center gap-2 px-3 py-1.5 mb-1 rounded-t-md bg-accent-soft text-accent-strong text-xs cursor-grab active:cursor-grabbing select-none touch-none"
         >
-          <span className="text-base leading-none">{'\u2807'}</span>
+          <span className="text-base leading-none" aria-hidden>{'\u2807'}</span>
           <span>{TILE_LABELS[id as TileId]}</span>
         </div>
       )}
-      <div className={editMode ? 'ring-2 ring-blue-300 dark:ring-blue-600 rounded-xl' : ''}>
+      <div className={editMode ? 'ring-2 ring-accent/50 rounded-lg' : ''}>
         {children}
       </div>
     </div>
@@ -364,7 +364,7 @@ function TileContent({
     case 'pressure':
       return (
         <CollapsibleSection
-          title={'\u{1F4CA} 気圧トレンド・アンサンブル'}
+          title={'気圧トレンド・アンサンブル'}
           isOpen={expandedSections.has(`pressure_${locId}`)}
           onToggle={() => toggleSection(`pressure_${locId}`)}
         >
@@ -374,7 +374,7 @@ function TileContent({
     case 'airquality':
       return (
         <CollapsibleSection
-          title={'\u{1F30D} UV・大気質 (PM2.5/AQI)'}
+          title={'UV・大気質 (PM2.5/AQI)'}
           isOpen={expandedSections.has(`aqi_${locId}`)}
           onToggle={() => toggleSection(`aqi_${locId}`)}
         >
@@ -384,7 +384,7 @@ function TileContent({
     case 'models':
       return (
         <CollapsibleSection
-          title={'\u{1F52C} マルチモデル比較'}
+          title={'マルチモデル比較'}
           isOpen={expandedSections.has(`models_${locId}`)}
           onToggle={() => toggleSection(`models_${locId}`)}
         >
@@ -394,7 +394,7 @@ function TileContent({
     case 'diary':
       return (
         <CollapsibleSection
-          title={'\u{1F4D3} 頭痛日記'}
+          title={'頭痛日記'}
           isOpen={expandedSections.has(`diary_${locId}`)}
           onToggle={() => toggleSection(`diary_${locId}`)}
         >
@@ -418,13 +418,13 @@ function CollapsibleSection({
   children: React.ReactNode
 }) {
   return (
-    <div className="rounded-xl bg-white dark:bg-slate-800 shadow-sm overflow-hidden">
+    <div className="rounded-lg bg-surface shadow-md overflow-hidden">
       <button
         onClick={onToggle}
-        className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
+        className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium text-ink-muted hover:bg-surface-sunk transition-colors duration-200 ease-out"
       >
         <span>{title}</span>
-        <span className={`transition-transform ${isOpen ? 'rotate-180' : ''}`}>{'\u25BC'}</span>
+        <span className={`transition-transform duration-200 ease-out text-ink-subtle ${isOpen ? 'rotate-180' : ''}`} aria-hidden>{'\u25BC'}</span>
       </button>
       {isOpen && <div className="px-0">{children}</div>}
     </div>
@@ -444,10 +444,10 @@ function ModelComparisonInfo({ models }: { models: LocationWeather['models'] }) 
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
           <thead>
-            <tr className="border-b border-slate-200 dark:border-slate-700">
-              <th className="text-left py-1 px-2 font-medium">モデル</th>
+            <tr className="border-b border-line">
+              <th className="text-left py-1 px-2 font-medium text-ink-muted">モデル</th>
               {hours.map(h => (
-                <th key={h.toISOString()} className="py-1 px-1 font-medium text-center min-w-[44px]">
+                <th key={h.toISOString()} className="nums py-1 px-1 font-medium text-center min-w-[44px] text-ink-muted">
                   {h.getHours()}時
                 </th>
               ))}
@@ -455,8 +455,8 @@ function ModelComparisonInfo({ models }: { models: LocationWeather['models'] }) 
           </thead>
           <tbody>
             {models.map(m => (
-              <tr key={m.model} className="border-b border-slate-100 dark:border-slate-700/50">
-                <td className="py-1.5 px-2">
+              <tr key={m.model} className="border-b border-line/60">
+                <td className="py-1.5 px-2 text-ink">
                   <span className="inline-flex items-center gap-1">
                     <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: m.color }} />
                     {m.model}
@@ -469,7 +469,7 @@ function ModelComparisonInfo({ models }: { models: LocationWeather['models'] }) 
                     return diff < 2 * 3600_000
                   })
                   return (
-                    <td key={h.toISOString()} className="py-1.5 px-1 text-center" title="気温 (℃)">
+                    <td key={h.toISOString()} className="nums py-1.5 px-1 text-center text-ink" title="気温 (℃)">
                       {point?.temperature !== null && point?.temperature !== undefined
                         ? `${point.temperature.toFixed(0)}\u00B0C`
                         : '--'}
@@ -481,7 +481,7 @@ function ModelComparisonInfo({ models }: { models: LocationWeather['models'] }) 
           </tbody>
         </table>
       </div>
-      <p className="inline-flex items-center gap-1 text-[10px] text-slate-400 dark:text-slate-500 mt-2">
+      <p className="inline-flex items-center gap-1 text-[10px] text-ink-subtle mt-2">
         数値は予報気温(℃)。モデル間の温度差が大きいほど予報の不確実性が高い
         <InfoTooltip term="modelDivergence" />
       </p>

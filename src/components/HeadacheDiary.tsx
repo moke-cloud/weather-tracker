@@ -1,6 +1,16 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { DiaryEntry } from '../lib/types'
 import { getDiaryEntries, removeDiaryEntry, getDiaryStats, getStorageInfo } from '../lib/diary'
+import { StatusDot, LockIcon, AlertIcon } from './icons'
+
+/** 重症度 1-5 → 状態ドットの色 */
+const SEVERITY_DOT: Record<number, string> = {
+  1: 'bg-low',
+  2: 'bg-caution',
+  3: 'bg-warn',
+  4: 'bg-danger',
+  5: 'bg-danger',
+}
 
 export function HeadacheDiary() {
   const [entries, setEntries] = useState<DiaryEntry[]>([])
@@ -31,15 +41,8 @@ export function HeadacheDiary() {
     reload()
   }, [reload])
 
-  const severityEmoji = (s: number) =>
-    s <= 1 ? '\u{1F7E2}' : s <= 2 ? '\u{1F7E1}' : s <= 3 ? '\u{1F7E0}' : s <= 4 ? '\u{1F534}' : '\u{1F7E3}'
-
   return (
-    <div className="rounded-xl bg-white dark:bg-slate-800 p-4 shadow-sm">
-      <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-3">
-        頭痛日記
-      </h3>
-
+    <div className="p-4">
       {/* Stats */}
       {stats && stats.totalEntries > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
@@ -51,7 +54,7 @@ export function HeadacheDiary() {
       )}
 
       {entries.length === 0 ? (
-        <p className="text-xs text-slate-400 dark:text-slate-500 text-center py-4">
+        <p className="text-xs text-ink-subtle text-center py-4">
           頭痛リスクパネルの「1〜5」ボタンで記録を開始できます。
           <br />
           記録が増えると、個人の傾向が見えてきます。
@@ -61,14 +64,14 @@ export function HeadacheDiary() {
           {entries.map(e => (
             <div
               key={e.id}
-              className="flex items-center gap-2 text-xs bg-slate-50 dark:bg-slate-700/50 rounded-lg px-3 py-2"
+              className="flex items-center gap-2 text-xs bg-surface-sunk rounded-md px-3 py-2"
             >
-              <span className="text-base">{severityEmoji(e.severity)}</span>
+              <StatusDot className={SEVERITY_DOT[e.severity] ?? 'bg-ink-subtle'} size={12} />
               <div className="flex-1 min-w-0">
-                <div className="font-medium">
+                <div className="nums font-medium text-ink">
                   重症度 {e.severity} / リスクスコア {e.riskScore}
                 </div>
-                <div className="text-slate-400 dark:text-slate-500">
+                <div className="nums text-ink-subtle">
                   {new Date(e.timestamp).toLocaleString('ja-JP', {
                     month: 'short',
                     day: 'numeric',
@@ -77,20 +80,21 @@ export function HeadacheDiary() {
                   })}
                   {e.pressure !== null && ` / ${e.pressure.toFixed(0)}hPa`}
                   {e.pressureChange3h !== null && (
-                    <span className={e.pressureChange3h < -1 ? 'text-red-400' : ''}>
+                    <span className={e.pressureChange3h < -1 ? 'text-danger' : ''}>
                       ({e.pressureChange3h > 0 ? '+' : ''}{e.pressureChange3h.toFixed(1)}/3h)
                     </span>
                   )}
-                  {e.temperature !== null && ` / ${e.temperature.toFixed(0)}\u00B0C`}
+                  {e.temperature !== null && ` / ${e.temperature.toFixed(0)}°C`}
                   {e.humidity !== null && ` / ${e.humidity.toFixed(0)}%`}
                 </div>
               </div>
               <button
                 onClick={() => handleDelete(e.id)}
-                className="text-slate-300 hover:text-red-400 dark:text-slate-600 dark:hover:text-red-400 transition-colors"
+                className="text-ink-subtle hover:text-danger transition-colors duration-200 ease-out"
                 title="削除"
+                aria-label="この記録を削除"
               >
-                {'\u2715'}
+                {'✕'}
               </button>
             </div>
           ))}
@@ -98,13 +102,15 @@ export function HeadacheDiary() {
       )}
 
       {/* Storage info */}
-      <div className="mt-3 pt-2 border-t border-slate-100 dark:border-slate-700/50 flex items-center justify-between text-[10px] text-slate-400 dark:text-slate-500">
+      <div className="mt-3 pt-2 border-t border-line flex items-center justify-between text-[10px] text-ink-subtle">
         {stats && stats.totalEntries >= 5 && (
           <span>発症時の気圧帯: {stats.commonPressureRange}</span>
         )}
         {storageInfo && (
-          <span className="ml-auto">
-            {storageInfo.persisted ? '\u{1F512}' : '\u26A0\uFE0F'}{' '}
+          <span className="nums ml-auto inline-flex items-center gap-1">
+            {storageInfo.persisted
+              ? <LockIcon size={11} className="text-ink-subtle" />
+              : <AlertIcon size={11} className="text-warn" />}
             {storageInfo.used} / {storageInfo.quota}
             {!storageInfo.persisted && ' (永続化未許可)'}
           </span>
@@ -116,9 +122,9 @@ export function HeadacheDiary() {
 
 function StatBox({ label, value }: { label: string; value: string }) {
   return (
-    <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-2 text-center">
-      <div className="text-lg font-bold">{value}</div>
-      <div className="text-[10px] text-slate-500 dark:text-slate-400">{label}</div>
+    <div className="bg-surface-sunk rounded-md p-2 text-center">
+      <div className="nums font-display text-lg font-bold text-ink">{value}</div>
+      <div className="text-[10px] text-ink-muted">{label}</div>
     </div>
   )
 }

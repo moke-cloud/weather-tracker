@@ -5,9 +5,13 @@ import {
   isNotificationEnabled,
   enableNotifications,
   disableNotifications,
+  sendTestNotification,
 } from './lib/notifications'
 import { Dashboard } from './components/Dashboard'
 import { LocationSearch } from './components/LocationSearch'
+import { WeatherIcon } from './components/WeatherIcon'
+import { DownloadIcon, BellIcon, BellOffIcon, SunIcon, MoonIcon } from './components/icons'
+import { ambientGlow } from './lib/sky'
 
 /* ── Platform detection ── */
 
@@ -30,7 +34,7 @@ function App() {
   const [showSearch, setShowSearch] = useState(false)
   const [showInstallGuide, setShowInstallGuide] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
-  const [notifEnabled, setNotifEnabled] = useState(isNotificationEnabled)
+  const [notifEnabled, setNotifEnabled] = useState(false)
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null)
   const [installed, setInstalled] = useState(isStandalone)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -47,6 +51,10 @@ function App() {
 
   useEffect(() => {
     getLocations().then(setLocations)
+  }, [])
+
+  useEffect(() => {
+    isNotificationEnabled().then(setNotifEnabled)
   }, [])
 
   useEffect(() => {
@@ -115,19 +123,26 @@ function App() {
   }, [notifEnabled])
 
   return (
-    <div className="min-h-dvh bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100">
+    <div className="relative min-h-dvh">
+      {/* 大気のアンビエント光 (時間帯で変化・ごく控えめ) */}
+      <div
+        aria-hidden
+        className="pointer-events-none fixed inset-x-0 top-0 h-[40vh] z-0"
+        style={{ background: ambientGlow(new Date()) }}
+      />
+
       {/* Header */}
-      <header className="sticky top-0 z-40 backdrop-blur-md bg-white/80 dark:bg-slate-900/80 border-b border-slate-200 dark:border-slate-700">
+      <header className="sticky top-0 z-40 backdrop-blur-md bg-canvas/75 border-b border-line">
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
-          <h1 className="text-lg font-bold flex items-center gap-2">
-            <span>{'\u{1F324}\uFE0F'}</span>
+          <h1 className="font-display text-xl font-bold flex items-center gap-2">
+            <WeatherIcon code={2} size={24} className="text-ink-muted" />
             TenkiTracker
           </h1>
           <div className="flex items-center gap-1.5">
             {/* Add location - icon only */}
             <button
               onClick={() => setShowSearch(true)}
-              className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-blue-600 dark:text-blue-400"
+              className="p-2 rounded-md text-accent-strong hover:bg-accent-soft transition-colors duration-200 ease-out"
               title="地点追加"
             >
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
@@ -141,7 +156,7 @@ function App() {
             <div className="relative" ref={menuRef}>
               <button
                 onClick={() => setShowMenu(v => !v)}
-                className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-500 dark:text-slate-400"
+                className="p-2 rounded-md text-ink-subtle hover:bg-surface-sunk hover:text-ink transition-colors duration-200 ease-out"
                 title="メニュー"
               >
                 <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
@@ -153,22 +168,29 @@ function App() {
 
               {/* Dropdown menu */}
               {showMenu && (
-                <div className="absolute right-0 mt-1 w-52 rounded-xl bg-white dark:bg-slate-800 shadow-lg border border-slate-200 dark:border-slate-700 py-1 z-50">
+                <div className="absolute right-0 mt-2 w-52 rounded-lg bg-surface-raised shadow-lg border border-line py-1 z-50">
                   {!installed && (
                     <MenuItem
-                      icon={'\u{2B07}\uFE0F'}
+                      icon={<DownloadIcon size={16} />}
                       label="アプリをインストール"
                       onClick={handleInstall}
                     />
                   )}
                   <MenuItem
-                    icon={notifEnabled ? '\u{1F514}' : '\u{1F515}'}
+                    icon={notifEnabled ? <BellIcon size={16} /> : <BellOffIcon size={16} />}
                     label={notifEnabled ? '通知をOFFにする' : '通知をONにする'}
                     onClick={() => { toggleNotifications(); setShowMenu(false) }}
                     accent={notifEnabled}
                   />
+                  {notifEnabled && (
+                    <MenuItem
+                      icon={<BellIcon size={16} />}
+                      label="通知をテスト"
+                      onClick={() => { sendTestNotification(); setShowMenu(false) }}
+                    />
+                  )}
                   <MenuItem
-                    icon={darkMode ? '\u2600\uFE0F' : '\u{1F319}'}
+                    icon={darkMode ? <SunIcon size={16} /> : <MoonIcon size={16} />}
                     label={darkMode ? 'ライトモード' : 'ダークモード'}
                     onClick={() => { setDarkMode(v => !v); setShowMenu(false) }}
                   />
@@ -180,12 +202,12 @@ function App() {
       </header>
 
       {/* Main content */}
-      <main className="max-w-4xl mx-auto px-4 py-6">
+      <main className="relative z-10 max-w-4xl mx-auto px-4 py-8">
         <Dashboard locations={locations} onRemoveLocation={handleRemoveLocation} />
       </main>
 
       {/* Footer */}
-      <footer className="max-w-4xl mx-auto px-4 py-4 text-xs text-slate-400 dark:text-slate-500 text-center border-t border-slate-200 dark:border-slate-700">
+      <footer className="relative z-10 max-w-4xl mx-auto px-4 py-6 text-xs text-ink-subtle text-center border-t border-line">
         <p>
           データソース: JMA AMeDAS / Open-Meteo (JMA MSM, ECMWF IFS, GFS + アンサンブル)
         </p>
@@ -215,7 +237,7 @@ function MenuItem({
   onClick,
   accent,
 }: {
-  icon: string
+  icon: React.ReactNode
   label: string
   onClick: () => void
   accent?: boolean
@@ -223,13 +245,13 @@ function MenuItem({
   return (
     <button
       onClick={onClick}
-      className={`w-full text-left px-4 py-2.5 text-sm flex items-center gap-3 transition-colors ${
+      className={`w-full text-left px-4 py-2.5 text-sm flex items-center gap-3 transition-colors duration-200 ease-out ${
         accent
-          ? 'text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30'
-          : 'text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/50'
+          ? 'text-accent-strong hover:bg-accent-soft'
+          : 'text-ink hover:bg-surface-sunk'
       }`}
     >
-      <span className="text-base">{icon}</span>
+      <span className="shrink-0 text-ink-muted">{icon}</span>
       {label}
     </button>
   )
@@ -242,13 +264,13 @@ function InstallGuide({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative w-full max-w-sm bg-white dark:bg-slate-800 rounded-2xl shadow-xl p-5">
-        <h2 className="text-lg font-bold mb-3">アプリをインストール</h2>
+      <div className="absolute inset-0 bg-ink/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full max-w-sm bg-surface-raised rounded-xl shadow-lg p-5">
+        <h2 className="font-display text-lg font-bold mb-3">アプリをインストール</h2>
 
         {platform === 'ios' && (
           <div className="space-y-3 text-sm">
-            <p className="text-slate-600 dark:text-slate-300">
+            <p className="text-ink-muted">
               iPhone / iPad にインストール:
             </p>
             <div className="space-y-2">
@@ -256,7 +278,7 @@ function InstallGuide({ onClose }: { onClose: () => void }) {
               <Step n={2} text={'"ホーム画面に追加" をタップ'} />
               <Step n={3} text={'"追加" をタップして完了'} />
             </div>
-            <p className="text-xs text-slate-400 dark:text-slate-500">
+            <p className="text-xs text-ink-subtle">
               ※ Safari でのみインストール可能です
             </p>
           </div>
@@ -264,26 +286,26 @@ function InstallGuide({ onClose }: { onClose: () => void }) {
 
         {platform === 'android' && (
           <div className="space-y-3 text-sm">
-            <p className="text-slate-600 dark:text-slate-300">
+            <p className="text-ink-muted">
               Android にインストール:
             </p>
             <div className="space-y-4">
               <div>
-                <p className="font-medium text-slate-700 dark:text-slate-200 mb-1.5">Chrome の場合</p>
+                <p className="font-medium text-ink mb-1.5">Chrome の場合</p>
                 <div className="space-y-2">
                   <Step n={1} text={'右上メニュー \u22EE をタップ'} />
                   <Step n={2} text={'"アプリをインストール" をタップ'} />
                 </div>
               </div>
               <div>
-                <p className="font-medium text-slate-700 dark:text-slate-200 mb-1.5">Firefox / その他のブラウザ</p>
+                <p className="font-medium text-ink mb-1.5">Firefox / その他のブラウザ</p>
                 <div className="space-y-2">
                   <Step n={1} text={'右上メニュー \u22EE をタップ'} />
                   <Step n={2} text={'"ホーム画面に追加" をタップ'} />
                 </div>
               </div>
             </div>
-            <p className="text-xs text-slate-400 dark:text-slate-500">
+            <p className="text-xs text-ink-subtle">
               ※ Chrome を推奨（通知機能も利用可能）
             </p>
           </div>
@@ -291,7 +313,7 @@ function InstallGuide({ onClose }: { onClose: () => void }) {
 
         {platform === 'desktop' && (
           <div className="space-y-3 text-sm">
-            <p className="text-slate-600 dark:text-slate-300">
+            <p className="text-ink-muted">
               PC にインストール:
             </p>
             <div className="space-y-2">
@@ -299,7 +321,7 @@ function InstallGuide({ onClose }: { onClose: () => void }) {
               <Step n={2} text={'または ブラウザメニュー \u22EE \u2192「アプリをインストール」'} />
               <Step n={3} text={'"インストール" をクリックして完了'} />
             </div>
-            <p className="text-xs text-slate-400 dark:text-slate-500">
+            <p className="text-xs text-ink-subtle">
               ※ Chrome / Edge に対応
             </p>
           </div>
@@ -307,7 +329,7 @@ function InstallGuide({ onClose }: { onClose: () => void }) {
 
         <button
           onClick={onClose}
-          className="mt-4 w-full py-2 text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300"
+          className="mt-4 w-full py-2 text-sm font-medium text-ink-muted hover:text-ink transition-colors duration-200 ease-out"
         >
           閉じる
         </button>
@@ -319,10 +341,10 @@ function InstallGuide({ onClose }: { onClose: () => void }) {
 function Step({ n, text }: { n: number; text: string }) {
   return (
     <div className="flex items-start gap-3">
-      <span className="shrink-0 w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 text-xs font-bold flex items-center justify-center">
+      <span className="nums shrink-0 w-6 h-6 rounded-full bg-accent-soft text-accent-strong text-xs font-bold flex items-center justify-center">
         {n}
       </span>
-      <span className="text-slate-700 dark:text-slate-200 pt-0.5">{text}</span>
+      <span className="text-ink pt-0.5">{text}</span>
     </div>
   )
 }

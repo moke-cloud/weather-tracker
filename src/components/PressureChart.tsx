@@ -14,6 +14,7 @@ import {
 import type { ModelForecast, EnsembleBand, AmedasObservation } from '../lib/types'
 import { pressureChangeRate } from '../lib/utils'
 import { InfoTooltip } from './InfoTooltip'
+import { AlertIcon } from './icons'
 import type { GlossaryKey } from '../lib/glossary'
 
 interface PressureChartProps {
@@ -102,30 +103,31 @@ export function PressureChart({ models, ensemble, amedas }: PressureChartProps) 
   const minP = allPressures.length > 0 ? Math.floor(Math.min(...allPressures) - 2) : 990
   const maxP = allPressures.length > 0 ? Math.ceil(Math.max(...allPressures) + 2) : 1030
 
+  const rateBadge =
+    Math.abs(changeRate ?? 0) > 2
+      ? 'bg-danger text-white'
+      : Math.abs(changeRate ?? 0) > 1
+        ? 'bg-caution text-[oklch(0.28_0.04_85)]'
+        : 'bg-safe text-white'
+
   return (
-    <div className="rounded-xl bg-white dark:bg-slate-800 p-4 shadow-sm">
+    <div className="p-4">
       <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-        <h3 className="inline-flex items-center gap-1 text-sm font-medium text-slate-500 dark:text-slate-400">
+        <h3 className="inline-flex items-center gap-1 text-sm font-medium text-ink-muted">
           気圧トレンド (過去3日 → 予報5日)
           <InfoTooltip term="pressureHpa" />
         </h3>
         <div className="flex items-center gap-3 text-sm flex-wrap">
           {currentPressure != null && (
-            <span className="inline-flex items-center gap-1 font-medium">
+            <span className="nums inline-flex items-center gap-1 font-semibold text-ink">
               現在 {currentPressure.toFixed(1)} hPa
             </span>
           )}
           {changeRate !== null && (
             <span
-              className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium ${
-                Math.abs(changeRate) > 2
-                  ? 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300'
-                  : Math.abs(changeRate) > 1
-                    ? 'bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300'
-                    : 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
-              }`}
+              className={`nums inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-semibold ${rateBadge}`}
             >
-              {changeRate > 0 ? '\u2191' : '\u2193'}{Math.abs(changeRate).toFixed(1)} hPa/h
+              {changeRate > 0 ? '↑' : '↓'}{Math.abs(changeRate).toFixed(1)} hPa/h
               <InfoTooltip term="pressureChangeRate" className="text-current" />
             </span>
           )}
@@ -134,18 +136,18 @@ export function PressureChart({ models, ensemble, amedas }: PressureChartProps) 
 
       <ResponsiveContainer width="100%" height={300}>
         <ComposedChart data={data} margin={{ top: 5, right: 10, left: 5, bottom: 20 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.2} />
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--line)" opacity={0.8} />
           <XAxis
             dataKey="label"
-            tick={{ fontSize: 10 }}
+            tick={{ fontSize: 10, fill: 'var(--ink-subtle)' }}
             interval="preserveStartEnd"
             tickCount={8}
           >
-            <Label value="時刻 (月/日 時)" offset={-15} position="insideBottom" style={{ fontSize: 10, fill: '#94a3b8' }} />
+            <Label value="時刻 (月/日 時)" offset={-15} position="insideBottom" style={{ fontSize: 10, fill: 'var(--ink-subtle)' }} />
           </XAxis>
           <YAxis
             domain={[minP, maxP]}
-            tick={{ fontSize: 10 }}
+            tick={{ fontSize: 10, fill: 'var(--ink-subtle)' }}
             tickFormatter={(v: number) => `${v}`}
             width={50}
           >
@@ -153,32 +155,33 @@ export function PressureChart({ models, ensemble, amedas }: PressureChartProps) 
               value="気圧 (hPa)"
               angle={-90}
               position="insideLeft"
-              style={{ fontSize: 10, fill: '#94a3b8', textAnchor: 'middle' }}
+              style={{ fontSize: 10, fill: 'var(--ink-subtle)', textAnchor: 'middle' }}
             />
           </YAxis>
           <Tooltip
             contentStyle={{
-              backgroundColor: 'rgba(15, 23, 42, 0.9)',
-              border: 'none',
-              borderRadius: '8px',
-              color: '#e2e8f0',
+              backgroundColor: 'var(--surface-raised)',
+              border: '1px solid var(--line)',
+              borderRadius: '10px',
+              color: 'var(--ink)',
               fontSize: '12px',
+              boxShadow: 'var(--shadow-md)',
             }}
             formatter={(value) => [
               `${Number(value).toFixed(1)} hPa`,
             ]}
           />
           <Legend
-            wrapperStyle={{ fontSize: '11px' }}
+            wrapperStyle={{ fontSize: '11px', color: 'var(--ink-muted)' }}
             iconType="line"
           />
 
-          {/* Ensemble confidence band */}
+          {/* Ensemble confidence band: P90 を薄塗り → P10 を背景色で抜いて帯を作る */}
           <Area
             dataKey="ensembleP90"
             stroke="none"
-            fill="#3b82f6"
-            fillOpacity={0.1}
+            fill="var(--cool)"
+            fillOpacity={0.16}
             name="ECMWF P90"
             dot={false}
             activeDot={false}
@@ -187,7 +190,7 @@ export function PressureChart({ models, ensemble, amedas }: PressureChartProps) 
           <Area
             dataKey="ensembleP10"
             stroke="none"
-            fill="#ffffff"
+            fill="var(--surface)"
             fillOpacity={1}
             name="ECMWF P10"
             dot={false}
@@ -211,7 +214,7 @@ export function PressureChart({ models, ensemble, amedas }: PressureChartProps) 
           {/* Ensemble median */}
           <Line
             dataKey="ensembleMedian"
-            stroke="#6366f1"
+            stroke="var(--accent-strong)"
             strokeWidth={1}
             strokeDasharray="4 4"
             dot={false}
@@ -222,23 +225,23 @@ export function PressureChart({ models, ensemble, amedas }: PressureChartProps) 
           {/* Now line */}
           <ReferenceLine
             x={formatChartTime(nowStr)}
-            stroke="#ef4444"
+            stroke="var(--danger)"
             strokeDasharray="3 3"
             strokeWidth={2}
-            label={{ value: '現在', fill: '#ef4444', fontSize: 10, position: 'top' }}
+            label={{ value: '現在', fill: 'var(--danger)', fontSize: 10, position: 'top' }}
           />
         </ComposedChart>
       </ResponsiveContainer>
 
       {/* Legend with tooltips */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-xs text-slate-500 dark:text-slate-400">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-xs text-ink-muted">
         <span className="inline-flex items-center gap-1">
-          <span className="inline-block w-6 h-2 rounded bg-blue-500/20" />
+          <span className="inline-block w-6 h-2 rounded bg-cool/20" />
           アンサンブル信頼帯 (P10-P90)
           <InfoTooltip term="ensembleBand" />
         </span>
         <span className="inline-flex items-center gap-1">
-          <span className="inline-block w-4 h-px border-t border-dashed border-indigo-500" />
+          <span className="inline-block w-4 h-px border-t border-dashed border-accent-strong" />
           中央値
           <InfoTooltip term="ensembleMedian" />
         </span>
@@ -253,8 +256,8 @@ export function PressureChart({ models, ensemble, amedas }: PressureChartProps) 
           </span>
         ))}
         {Math.abs(changeRate ?? 0) > 2 && (
-          <span className="text-red-500 font-medium">
-            ⚠ 急激な気圧変動を検知
+          <span className="inline-flex items-center gap-1 text-danger font-medium">
+            <AlertIcon size={12} /> 急激な気圧変動を検知
           </span>
         )}
       </div>

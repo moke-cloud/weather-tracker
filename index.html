@@ -6,13 +6,20 @@
     <link rel="manifest" href="manifest.json" />
     <link rel="apple-touch-icon" href="icon-192.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#0f172a" />
+    <meta name="theme-color" content="#dbe6f2" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#1a2535" media="(prefers-color-scheme: dark)" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="description" content="マルチモデル予報比較、研究ベース頭痛リスク予測、気圧トレンド・アンサンブル" />
     <title>TenkiTracker - 高精度天気・気圧トラッカー</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700&family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
   </head>
-  <body class="bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100">
+  <body class="bg-canvas text-ink antialiased">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
     <script>

@@ -24,7 +24,7 @@ export function InfoTooltip({
   term,
   title,
   body,
-  className = 'text-slate-400 dark:text-slate-500',
+  className = 'text-ink-subtle',
   position = 'auto',
 }: InfoTooltipProps) {
   const [open, setOpen] = useState(false)
@@ -84,14 +84,14 @@ export function InfoTooltip({
         onBlur={() => setOpen(false)}
         aria-label={`${content.title} の説明を表示`}
         aria-expanded={open}
-        className={`inline-flex items-center justify-center w-4 h-4 rounded-full border border-current opacity-60 hover:opacity-100 focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-blue-400 transition-opacity ${className}`}
+        className={`inline-flex items-center justify-center w-4 h-4 rounded-full border border-current opacity-60 hover:opacity-100 focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-accent transition-opacity ${className}`}
       >
         <span className="text-[9px] font-bold leading-none select-none">i</span>
       </button>
       {open && content.title && (
         <span
           role="tooltip"
-          className={`absolute z-50 left-1/2 -translate-x-1/2 w-64 max-w-[80vw] rounded-lg bg-slate-900 dark:bg-slate-700 text-slate-100 text-xs leading-relaxed shadow-xl p-2.5 pointer-events-none ${
+          className={`absolute z-50 left-1/2 -translate-x-1/2 w-64 max-w-[80vw] rounded-md bg-ink text-canvas text-xs leading-relaxed shadow-lg p-2.5 pointer-events-none ${
             placeAbove ? 'bottom-full mb-2' : 'top-full mt-2'
           }`}
         >
