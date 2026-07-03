@@ -141,6 +141,9 @@ function buildForecastUrl(lat: number, lon: number, modelIds: string): string {
     `&hourly=${HOURLY_PARAMS}` +
     `&daily=${DAILY_PARAMS}` +
     `&past_days=3&forecast_days=7` +
+    // 既定はkm/h。AMeDAS実測・体感温度(Steadman)・傘予報の強風判定は
+    // すべて m/s 前提のため必ず指定する
+    `&wind_speed_unit=ms` +
     `&timezone=Asia%2FTokyo`
   )
 }
