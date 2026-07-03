@@ -37,7 +37,10 @@ import type { GlossaryKey } from '../lib/glossary'
 const MODEL_TERM: Record<string, GlossaryKey> = {
   JMA: 'jmaMsm',
   ECMWF: 'ecmwfIfs',
+  ICON: 'iconModel',
+  UKMO: 'ukmoModel',
   GFS: 'gfs',
+  GEM: 'gemModel',
   [CONSENSUS_LABEL]: 'consensusForecast',
 }
 
@@ -387,9 +390,9 @@ function TileContent({
     case 'headache':
       return <HeadacheRiskPanel data={data} />
     case 'umbrella':
-      return <UmbrellaTimeline models={data.models} consensus={data.consensus} />
+      return <UmbrellaTimeline data={data} />
     case 'hourly':
-      return <HourlySummary models={data.models} />
+      return <HourlySummary models={data.models} consensus={data.consensus} now={data.fetchedAt} />
     case 'forecast':
       return <ForecastTable daily={data.daily} />
     case 'pressure':
@@ -399,7 +402,7 @@ function TileContent({
           isOpen={expandedSections.has(`pressure_${locId}`)}
           onToggle={() => toggleSection(`pressure_${locId}`)}
         >
-          <PressureChart models={data.models} ensemble={data.ensemble} amedas={data.amedas} />
+          <PressureChart models={data.models} consensus={data.consensus} ensemble={data.ensemble} amedas={data.amedas} />
         </CollapsibleSection>
       )
     case 'airquality':

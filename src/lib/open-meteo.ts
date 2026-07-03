@@ -12,10 +12,23 @@ const ENSEMBLE_URL = 'https://ensemble-api.open-meteo.com/v1/ensemble'
 const AIR_QUALITY_URL = 'https://air-quality-api.open-meteo.com/v1/air-quality'
 const GEOCODING_URL = 'https://geocoding-api.open-meteo.com/v1/search'
 
+/**
+ * 予報モデル。多モデル合意 (multi-model consensus) は単一モデルを
+ * ほぼ常に上回るという検証結果に基づき、主要気象機関6モデルを取得する。
+ * - JMA MSM: 日本域5km高解像度 (短期の日本最強)
+ * - ECMWF IFS: 世界最高精度のグローバルモデル (中期)
+ * - ICON: ドイツDWD、グローバル上位常連
+ * - UKMO: 英国気象庁 Unified Model
+ * - GFS: 米NOAA (降水確率の主要ソース)
+ * - GEM: カナダ環境省
+ */
 export const MODELS = [
   { id: 'jma_seamless', label: 'JMA', color: '#3b82f6' },
   { id: 'ecmwf_ifs025', label: 'ECMWF', color: '#10b981' },
+  { id: 'icon_seamless', label: 'ICON', color: '#a855f7' },
+  { id: 'ukmo_seamless', label: 'UKMO', color: '#ec4899' },
   { id: 'gfs_seamless', label: 'GFS', color: '#f59e0b' },
+  { id: 'gem_seamless', label: 'GEM', color: '#14b8a6' },
 ] as const
 
 const HOURLY_PARAMS = [
@@ -87,8 +100,10 @@ function parseHourlyPoints(
 }
 
 function parseDaily(daily: ApiData, times: string[]): DailyForecast[] {
-  const primaryModel = MODELS[0].id
-  const precipProbModel = MODELS[1].id // ECMWF has precip probability
+  const primaryModel = 'jma_seamless'
+  // 降水確率を提供するモデルのみ (JMAはnull): ECMWF → GFS の順で採用
+  const precipProbModel = 'ecmwf_ifs025'
+  const precipProbFallback = 'gfs_seamless'
 
   const pick = (param: string, modelId: string): (number | null)[] =>
     getSeries(daily, param, modelId)
@@ -101,7 +116,7 @@ function parseDaily(daily: ApiData, times: string[]): DailyForecast[] {
     precipSum: pick('precipitation_sum', primaryModel)[i] ?? null,
     precipProbMax:
       pick('precipitation_probability_max', precipProbModel)[i] ??
-      pick('precipitation_probability_max', MODELS[2].id)[i] ??
+      pick('precipitation_probability_max', precipProbFallback)[i] ??
       null,
     uvIndexMax: pick('uv_index_max', primaryModel)[i] ?? null,
   }))
@@ -200,28 +215,45 @@ function parseCombined(
   return { models, daily: parseDaily(daily, dailyTimes) }
 }
 
-/** メンバー系列から p10/median/p90 と「3h以内に1.5hPa以上降下する確率」を算出 */
+/**
+ * メンバー系列から p10/median/p90、「3h以内に1.5hPa以上降下する確率」、
+ * 「降水確率 (0.1mm/h以上のメンバー割合)」を算出。
+ * 降水確率はアンサンブル由来のほうが決定論的モデル由来より検証成績が良い。
+ */
 export function computeEnsembleBands(
   times: string[],
-  memberSeries: (number | null)[][]
+  pressureMembers: (number | null)[][],
+  precipMembers: (number | null)[][] = []
 ): EnsembleBand[] {
   const DROP_THRESHOLD_HPA = 1.5
   const DROP_WINDOW_HOURS = 3
+  const RAIN_THRESHOLD_MM = 0.1
 
   return times.map((t, i) => {
-    const values = memberSeries
+    const values = pressureMembers
       .map((series) => series[i])
       .filter((v): v is number => v != null)
       .sort((a, b) => a - b)
 
+    // 降水確率: この時刻に雨を降らせているメンバーの割合
+    let rainCount = 0
+    let rainTotal = 0
+    for (const series of precipMembers) {
+      const v = series[i]
+      if (v == null) continue
+      rainTotal++
+      if (v >= RAIN_THRESHOLD_MM) rainCount++
+    }
+    const rainProb = rainTotal > 0 ? rainCount / rainTotal : null
+
     if (values.length === 0) {
-      return { time: t, median: null, p10: null, p90: null, dropProb3h: null }
+      return { time: t, median: null, p10: null, p90: null, dropProb3h: null, rainProb }
     }
 
     // 各メンバーについて、i 時点から3時間以内の最小値との差が閾値以上か
     let dropCount = 0
     let dropTotal = 0
-    for (const series of memberSeries) {
+    for (const series of pressureMembers) {
       const base = series[i]
       if (base == null) continue
       let minAhead = base
@@ -243,37 +275,85 @@ export function computeEnsembleBands(
       p10: values[p10Idx],
       p90: values[p90Idx],
       dropProb3h: dropTotal > 0 ? dropCount / dropTotal : null,
+      rainProb,
     }
   })
 }
 
+/** アンサンブル予報モデル: ECMWF ENS 51メンバー + NOAA GEFS 31メンバー */
+const ENSEMBLE_MODELS = ['ecmwf_ifs025', 'gfs025'] as const
+
+interface EnsembleRaw {
+  times: string[]
+  pressure: (number | null)[][]
+  precip: (number | null)[][]
+}
+
+function parseEnsembleResponse(hourly: ApiData): EnsembleRaw | null {
+  const times = (hourly.time as string[] | undefined) ?? []
+  if (times.length === 0) return null
+  // コントロールラン (サフィックスなし) + 摂動メンバー (memberXX)
+  const memberKeys = (param: string): string[] =>
+    Object.keys(hourly).filter(
+      (k) => k === param || k.startsWith(`${param}_member`)
+    )
+  const pressureKeys = memberKeys('pressure_msl')
+  const precipKeys = memberKeys('precipitation')
+  if (pressureKeys.length === 0 && precipKeys.length === 0) return null
+  return {
+    times,
+    pressure: pressureKeys.map((k) => getArray(hourly, k)),
+    precip: precipKeys.map((k) => getArray(hourly, k)),
+  }
+}
+
+/**
+ * マルチモデルアンサンブル取得。ECMWF ENS と GEFS を別リクエストで
+ * 並列取得してメンバーをプールする (片方の障害が全体を殺さない +
+ * 単一モデルリクエストはメンバーのキー形式が安定)。
+ */
 export async function fetchEnsembleForecast(
   lat: number,
   lon: number
 ): Promise<EnsembleBand[]> {
-  const url =
-    `${ENSEMBLE_URL}?latitude=${lat}&longitude=${lon}` +
-    `&models=ecmwf_ifs025` +
-    `&hourly=pressure_msl` +
-    `&past_days=3&forecast_days=5` +
-    `&timezone=Asia%2FTokyo`
-
-  try {
-    const data = await fetchJson<{ hourly?: ApiData }>(url)
-    const hourly = data.hourly
-    if (!hourly) return []
-
-    const times = (hourly.time as string[] | undefined) ?? []
-    const memberKeys = Object.keys(hourly).filter((k) =>
-      k.startsWith('pressure_msl_member')
+  const results = await Promise.allSettled(
+    ENSEMBLE_MODELS.map((model) =>
+      fetchJson<{ hourly?: ApiData }>(
+        `${ENSEMBLE_URL}?latitude=${lat}&longitude=${lon}` +
+          `&models=${model}` +
+          `&hourly=pressure_msl,precipitation` +
+          `&past_days=3&forecast_days=5` +
+          `&timezone=Asia%2FTokyo`,
+        { retries: 1 }
+      )
     )
-    if (times.length === 0 || memberKeys.length === 0) return []
+  )
 
-    const memberSeries = memberKeys.map((k) => getArray(hourly, k))
-    return computeEnsembleBands(times, memberSeries)
-  } catch {
-    return []
+  const parsed: EnsembleRaw[] = []
+  for (const r of results) {
+    if (r.status !== 'fulfilled' || !r.value.hourly) continue
+    const p = parseEnsembleResponse(r.value.hourly)
+    if (p) parsed.push(p)
   }
+  if (parsed.length === 0) return []
+
+  // 時間軸は最初の成功モデルを基準にし、他モデルは時刻文字列で整列する
+  const base = parsed[0]
+  const pressure: (number | null)[][] = [...base.pressure]
+  const precip: (number | null)[][] = [...base.precip]
+
+  for (const other of parsed.slice(1)) {
+    const indexByTime = new Map(other.times.map((t, i) => [t, i]))
+    const align = (series: (number | null)[]): (number | null)[] =>
+      base.times.map((t) => {
+        const idx = indexByTime.get(t)
+        return idx == null ? null : series[idx] ?? null
+      })
+    pressure.push(...other.pressure.map(align))
+    precip.push(...other.precip.map(align))
+  }
+
+  return computeEnsembleBands(base.times, pressure, precip)
 }
 
 export async function fetchAirQuality(

@@ -19,6 +19,8 @@ import type { GlossaryKey } from '../lib/glossary'
 
 interface PressureChartProps {
   models: ModelForecast[]
+  /** コンセンサス予報 (太線で強調表示) */
+  consensus?: ModelForecast | null
   ensemble: EnsembleBand[]
   amedas: AmedasObservation | null
 }
@@ -36,10 +38,13 @@ interface ChartPoint {
 const MODEL_TERM: Record<string, GlossaryKey> = {
   JMA: 'jmaMsm',
   ECMWF: 'ecmwfIfs',
+  ICON: 'iconModel',
+  UKMO: 'ukmoModel',
   GFS: 'gfs',
+  GEM: 'gemModel',
 }
 
-export function PressureChart({ models, ensemble, amedas }: PressureChartProps) {
+export function PressureChart({ models, consensus, ensemble, amedas }: PressureChartProps) {
   const now = new Date()
   const nowStr = now.toISOString()
 
@@ -59,8 +64,9 @@ export function PressureChart({ models, ensemble, amedas }: PressureChartProps) 
     timeMap.set(key, existing)
   }
 
-  // Add model forecast data
-  for (const m of models) {
+  // Add model forecast data (コンセンサスも1系列として重ねる)
+  const lineSources = consensus ? [...models, consensus] : models
+  for (const m of lineSources) {
     for (const h of m.hourly) {
       if (h.pressureMsl === null) continue
       const key = h.time
@@ -182,7 +188,7 @@ export function PressureChart({ models, ensemble, amedas }: PressureChartProps) 
             stroke="none"
             fill="var(--cool)"
             fillOpacity={0.16}
-            name="ECMWF P90"
+            name="アンサンブル P90"
             dot={false}
             activeDot={false}
             legendType="none"
@@ -192,19 +198,20 @@ export function PressureChart({ models, ensemble, amedas }: PressureChartProps) 
             stroke="none"
             fill="var(--surface)"
             fillOpacity={1}
-            name="ECMWF P10"
+            name="アンサンブル P10"
             dot={false}
             activeDot={false}
             legendType="none"
           />
 
-          {/* Model forecast lines */}
-          {models.map((m) => (
+          {/* Model forecast lines (コンセンサスは太線で強調) */}
+          {lineSources.map((m) => (
             <Line
               key={m.model}
               dataKey={m.model}
               stroke={m.color}
-              strokeWidth={1.5}
+              strokeWidth={m === consensus ? 2.5 : 1}
+              strokeOpacity={m === consensus ? 1 : 0.75}
               dot={false}
               name={m.model}
               connectNulls
@@ -245,14 +252,18 @@ export function PressureChart({ models, ensemble, amedas }: PressureChartProps) 
           中央値
           <InfoTooltip term="ensembleMedian" />
         </span>
-        {models.map(m => (
+        {lineSources.map(m => (
           <span key={m.model} className="inline-flex items-center gap-1">
             <span
-              className="inline-block w-4 h-0.5 rounded"
+              className={`inline-block w-4 rounded ${m === consensus ? 'h-1' : 'h-0.5'}`}
               style={{ backgroundColor: m.color }}
             />
             {m.model}
-            {MODEL_TERM[m.model] && <InfoTooltip term={MODEL_TERM[m.model]} />}
+            {m === consensus ? (
+              <InfoTooltip term="consensusForecast" />
+            ) : (
+              MODEL_TERM[m.model] && <InfoTooltip term={MODEL_TERM[m.model]} />
+            )}
           </span>
         ))}
         {Math.abs(changeRate ?? 0) > 2 && (

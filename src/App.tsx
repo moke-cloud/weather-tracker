@@ -209,10 +209,18 @@ function App() {
       {/* Footer */}
       <footer className="relative z-10 max-w-4xl mx-auto px-4 py-6 text-xs text-ink-subtle text-center border-t border-line">
         <p>
-          データソース: JMA AMeDAS / Open-Meteo (JMA MSM, ECMWF IFS, GFS + アンサンブル)
+          データソース: JMA AMeDAS / Open-Meteo 6モデル (JMA MSM, ECMWF, ICON, UKMO, GFS, GEM) + 82メンバーアンサンブル
         </p>
         <p className="mt-1">
-          頭痛予測: 医学論文ベース多因子モデル (Kimoto 2011, Mukamal 2009 他)
+          頭痛予測: 医学論文ベース多因子モデル (Kimoto 2011, Mukamal 2009 他) /{' '}
+          <a
+            href="https://github.com/moke-cloud/weather-tracker/blob/main/API.md"
+            target="_blank"
+            rel="noreferrer"
+            className="underline hover:text-ink-muted"
+          >
+            公開API
+          </a>
         </p>
       </footer>
 

@@ -17,10 +17,24 @@ import type { ModelForecast, HourlyPoint, AmedasObservation } from './types'
 export const CONSENSUS_LABEL = 'コンセンサス'
 export const CONSENSUS_COLOR = '#6366f1'
 
-/** 短期 (0-48h) の既定重み */
-const SHORT_WEIGHTS: Record<string, number> = { JMA: 0.45, ECMWF: 0.35, GFS: 0.2 }
-/** 中期 (60h以降) の重み: ECMWF優位 */
-const MEDIUM_WEIGHTS: Record<string, number> = { JMA: 0.25, ECMWF: 0.5, GFS: 0.25 }
+/** 短期 (0-48h) の既定重み: 日本域は高解像度領域モデルJMA MSMを最重視 */
+const SHORT_WEIGHTS: Record<string, number> = {
+  JMA: 0.3,
+  ECMWF: 0.2,
+  ICON: 0.14,
+  UKMO: 0.14,
+  GFS: 0.11,
+  GEM: 0.11,
+}
+/** 中期 (60h以降) の重み: グローバル検証成績トップのECMWF優位 */
+const MEDIUM_WEIGHTS: Record<string, number> = {
+  JMA: 0.14,
+  ECMWF: 0.28,
+  ICON: 0.16,
+  UKMO: 0.17,
+  GFS: 0.13,
+  GEM: 0.12,
+}
 /** 短期→中期へ重みを線形遷移させるリード時間帯 */
 const TRANSITION_START_H = 36
 const TRANSITION_END_H = 60
@@ -194,21 +208,49 @@ function applyNudge(points: HourlyPoint[], offsets: NudgeOffsets): HourlyPoint[]
   })
 }
 
+/** モデル別の系統誤差 (accuracy.ts で「予報 − 実測」の平均として算出) */
+export interface ModelBias {
+  temp: number
+  pressure: number
+}
+
+/** 系統バイアスを予報値から差し引いたモデルのコピーを返す (MOS的補正) */
+function applyBiasCorrection(
+  models: ModelForecast[],
+  biases: Record<string, ModelBias>
+): ModelForecast[] {
+  return models.map((m) => {
+    const bias = biases[m.model]
+    if (!bias || (bias.temp === 0 && bias.pressure === 0)) return m
+    return {
+      ...m,
+      hourly: m.hourly.map((h) => ({
+        ...h,
+        temperature: h.temperature != null ? h.temperature - bias.temp : null,
+        pressureMsl: h.pressureMsl != null ? h.pressureMsl - bias.pressure : null,
+      })),
+    }
+  })
+}
+
 /**
  * コンセンサス予報を生成する。
  * @param models 取得できたモデル予報 (1つ以上)
  * @param amedas 実測値 (null可; あればナッジング)
  * @param dynamicWeights accuracy.ts の検証成績由来の重み (null で既定重み)
  * @param now テスト用の現在時刻
+ * @param biases モデル別系統誤差 (ブレンド前に予報値から除去)
  */
 export function computeConsensus(
   models: ModelForecast[],
   amedas: AmedasObservation | null,
   dynamicWeights?: Record<string, number> | null,
-  now: number = Date.now()
+  now: number = Date.now(),
+  biases?: Record<string, ModelBias> | null
 ): ModelForecast | null {
-  const withData = models.filter((m) => m.hourly.length > 0)
+  let withData = models.filter((m) => m.hourly.length > 0)
   if (withData.length === 0) return null
+  if (biases) withData = applyBiasCorrection(withData, biases)
 
   // 時間軸は最長のモデルに合わせる (全モデル同一時間軸が前提だが欠損に備える)
   const base = withData.reduce((a, b) =>

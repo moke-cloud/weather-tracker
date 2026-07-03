@@ -97,7 +97,7 @@ export function LocationSearch({ onAdd, onClose }: LocationSearchProps) {
     setSearching(true)
     try {
       let res = await searchLocation(query)
-      if (res.length === 0 && /[^\x00-\x7F]/.test(query)) {
+      if (res.length === 0 && /[^ -~]/.test(query)) {
         const q = query.replace(/[市区町村県府都道]$/g, '')
         const allAreas: { name: string; lat: number; lon: number; label: string }[] = []
         for (const r of REGIONS) {
@@ -194,7 +194,7 @@ export function LocationSearch({ onAdd, onClose }: LocationSearchProps) {
               type="text"
               value={postalCode}
               onChange={e => {
-                let v = e.target.value.replace(/[^0-9\-]/g, '')
+                let v = e.target.value.replace(/[^0-9-]/g, '')
                 if (v.length === 3 && !v.includes('-') && postalCode.length < v.length) {
                   v = v + '-'
                 }

@@ -7,7 +7,13 @@ import {
 } from './open-meteo'
 import { computeConsensus } from './consensus'
 import { saveWeatherSnapshot, loadWeatherSnapshot } from './weather-cache'
-import { getModelSkills, skillsToWeights, logForecasts, reconcileObservation } from './accuracy'
+import {
+  getModelSkills,
+  getModelBiases,
+  skillsToWeights,
+  logForecasts,
+  reconcileObservation,
+} from './accuracy'
 
 /**
  * 地点の天気データを全ソースから取得する。
@@ -57,12 +63,14 @@ export async function fetchWeatherForLocation(
     await reconcileObservation(location.id, amedas)
   }
 
-  // 検証成績由来の動的重みでコンセンサス予報を生成
-  const skills = await getModelSkills()
+  // 検証成績由来の動的重み + 系統バイアス補正でコンセンサス予報を生成
+  const [skills, biases] = await Promise.all([getModelSkills(), getModelBiases()])
   const consensus = computeConsensus(
     forecast.models,
     amedas,
-    skillsToWeights(skills)
+    skillsToWeights(skills),
+    Date.now(),
+    biases
   )
 
   const data: LocationWeather = {

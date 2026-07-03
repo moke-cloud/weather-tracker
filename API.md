@@ -63,7 +63,8 @@ if (success) {
 
 ## データの性質と注意
 
-- コンセンサス予報は JMA MSM / ECMWF IFS 0.25° / GFS の3モデル加重平均に、AMeDAS実測によるバイアス補正を加えたものです。短期はJMA、3日目以降はECMWFを重視します。
+- コンセンサス予報は JMA MSM / ECMWF IFS 0.25° / ICON / UKMO / GFS / GEM の6モデル加重平均に、AMeDAS実測によるバイアス補正を加えたものです。短期はJMA、3日目以降はECMWFを重視します。
+- 降水確率は ECMWF ENS 51メンバー + NOAA GEFS 31メンバーの計82メンバーアンサンブルから算出した確率を主成分にしています。
 - 頭痛リスクは医学論文の閾値に基づく参考値であり、医療行為の代替にはなりません。
 - 静的JSONのため、リクエスト時点ではなく `meta.generatedAt` 時点の計算結果です (最大約1時間前)。
 - レベル定義: 頭痛リスクは `safe / low / moderate / high / critical` の5段階。傘予報レンジの `level` は `fold` (折りたたみ) / `umbrella` (傘必須) / `strong` (強雨・強風)。

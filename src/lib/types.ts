@@ -44,6 +44,8 @@ export interface EnsembleBand {
   p90: number | null
   /** この時刻から3時間以内に1.5hPa以上気圧が下がるメンバーの割合 (0-1) */
   dropProb3h?: number | null
+  /** この時刻に0.1mm/h以上の降水があるメンバーの割合 (0-1) */
+  rainProb?: number | null
 }
 
 export interface AirQualityData {

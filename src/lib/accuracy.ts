@@ -228,7 +228,82 @@ export function computeSkillsFromEntries(
 }
 
 /** 既定 prior (consensus.ts の短期重みと同じ) */
-const SKILL_PRIORS: Record<string, number> = { JMA: 0.45, ECMWF: 0.35, GFS: 0.2 }
+const SKILL_PRIORS: Record<string, number> = {
+  JMA: 0.3,
+  ECMWF: 0.2,
+  ICON: 0.14,
+  UKMO: 0.14,
+  GFS: 0.11,
+  GEM: 0.11,
+}
+
+/** 系統バイアス算出に使う検証期間と最小サンプル数 */
+const BIAS_WINDOW_MS = 48 * 3_600_000
+const BIAS_MIN_SAMPLES = 4
+/** 異常値でブレンドを壊さないためのバイアス上限 */
+const BIAS_CAP = { temp: 3, pressure: 2 }
+
+/**
+ * 直近48時間の照合結果からモデル別の系統誤差 (予報−実測の平均) を算出する
+ * 純関数。サンプル不足のモデルは含めない。
+ */
+export function computeBiasesFromEntries(
+  entries: ForecastLogEntry[],
+  now: number = Date.now()
+): Record<string, { temp: number; pressure: number }> {
+  const clampBias = (v: number, cap: number) => Math.max(-cap, Math.min(cap, v))
+
+  const recent = entries.filter(
+    (e) =>
+      e.verifiedAt != null &&
+      now - new Date(e.targetTime).getTime() <= BIAS_WINDOW_MS
+  )
+
+  const byModel = new Map<string, ForecastLogEntry[]>()
+  for (const e of recent) {
+    const list = byModel.get(e.model) ?? []
+    list.push(e)
+    byModel.set(e.model, list)
+  }
+
+  const biases: Record<string, { temp: number; pressure: number }> = {}
+  for (const [model, list] of byModel) {
+    const tempErrs = list
+      .filter((e) => e.predictedTemp != null && e.observedTemp != null)
+      .map((e) => e.predictedTemp! - e.observedTemp!)
+    const pressErrs = list
+      .filter((e) => e.predictedPressure != null && e.observedPressure != null)
+      .map((e) => e.predictedPressure! - e.observedPressure!)
+
+    if (tempErrs.length < BIAS_MIN_SAMPLES && pressErrs.length < BIAS_MIN_SAMPLES) {
+      continue
+    }
+    biases[model] = {
+      temp:
+        tempErrs.length >= BIAS_MIN_SAMPLES
+          ? clampBias(tempErrs.reduce((s, v) => s + v, 0) / tempErrs.length, BIAS_CAP.temp)
+          : 0,
+      pressure:
+        pressErrs.length >= BIAS_MIN_SAMPLES
+          ? clampBias(pressErrs.reduce((s, v) => s + v, 0) / pressErrs.length, BIAS_CAP.pressure)
+          : 0,
+    }
+  }
+  return biases
+}
+
+/** IndexedDBのログから系統バイアスを算出 */
+export async function getModelBiases(): Promise<
+  Record<string, { temp: number; pressure: number }>
+> {
+  try {
+    const db = await getDB()
+    const entries = await db.getAll('forecast-log')
+    return computeBiasesFromEntries(entries)
+  } catch {
+    return {}
+  }
+}
 
 /** IndexedDBから全地点分のログを読み、動的重みを返す */
 export async function getModelSkills(): Promise<ModelSkill[]> {

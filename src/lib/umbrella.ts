@@ -11,6 +11,7 @@
  */
 
 import type {
+  EnsembleBand,
   ModelForecast,
   UmbrellaForecast,
   UmbrellaHour,
@@ -170,35 +171,61 @@ function buildSummary(ranges: UmbrellaRange[], now: number): string {
 }
 
 /**
+ * アンサンブル降水確率 (82メンバー) と決定論モデル由来の確率をブレンドする。
+ * アンサンブル由来のPoPは決定論由来より検証成績が良いため重み0.6。
+ */
+function blendProbability(
+  modelProb: number | null,
+  ensembleRainProb: number | null | undefined
+): number | null {
+  if (ensembleRainProb == null) return modelProb
+  const ensemblePct = ensembleRainProb * 100
+  if (modelProb == null) return Math.round(ensemblePct)
+  return Math.round(modelProb * 0.4 + ensemblePct * 0.6)
+}
+
+/**
  * 傘予報を算出する。
  * @param models 全モデル (合意度計算に使用)
  * @param consensus コンセンサス予報 (null なら models[0] で判定)
  * @param horizonHours 予報対象時間 (既定48h)
  * @param now テスト用の現在時刻
+ * @param ensemble アンサンブル (あれば降水確率をメンバー由来で強化)
  */
 export function computeUmbrellaForecast(
   models: ModelForecast[],
   consensus: ModelForecast | null,
   horizonHours: number = DEFAULT_HORIZON_HOURS,
-  now: number = Date.now()
+  now: number = Date.now(),
+  ensemble: EnsembleBand[] = []
 ): UmbrellaForecast {
   const source = consensus ?? models[0]
   if (!source) {
     return { hours: [], ranges: [], summary: 'データがありません' }
   }
 
+  const rainProbByTime = new Map(
+    ensemble.filter((e) => e.rainProb != null).map((e) => [e.time, e.rainProb!])
+  )
+
   const hours: UmbrellaHour[] = source.hourly
     .filter((h) => {
       const t = new Date(h.time).getTime()
       return t >= now - 30 * 60_000 && t <= now + horizonHours * 3_600_000
     })
-    .map((h) => ({
-      time: h.time,
-      level: classifyHour(h.precipitationProbability, h.precipitation, h.windSpeed),
-      probability: h.precipitationProbability,
-      precipitation: h.precipitation,
-      confidence: modelAgreement(models, h.time),
-    }))
+    .map((h) => {
+      const probability = blendProbability(
+        h.precipitationProbability,
+        rainProbByTime.get(h.time)
+      )
+      return {
+        time: h.time,
+        level: classifyHour(probability, h.precipitation, h.windSpeed),
+        probability,
+        precipitation: h.precipitation,
+        confidence: modelAgreement(models, h.time),
+      }
+    })
 
   const ranges = buildRanges(hours)
   return { hours, ranges, summary: buildSummary(ranges, now) }

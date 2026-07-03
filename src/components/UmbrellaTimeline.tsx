@@ -1,12 +1,11 @@
 import { useMemo } from 'react'
-import type { ModelForecast, UmbrellaLevel } from '../lib/types'
+import type { LocationWeather, UmbrellaLevel } from '../lib/types'
 import { computeUmbrellaForecast } from '../lib/umbrella'
 import { InfoTooltip } from './InfoTooltip'
 import { UmbrellaIcon, StatusDot } from './icons'
 
 interface UmbrellaTimelineProps {
-  models: ModelForecast[]
-  consensus: ModelForecast | null
+  data: LocationWeather
 }
 
 const LEVEL_CELL: Record<UmbrellaLevel, string> = {
@@ -49,10 +48,18 @@ function formatRangeTime(start: string, end: string): string {
   return `${sDay} ${s.getHours()}時〜${eDay}${endHour}時`
 }
 
-export function UmbrellaTimeline({ models, consensus }: UmbrellaTimelineProps) {
+export function UmbrellaTimeline({ data }: UmbrellaTimelineProps) {
+  // 「現在」はデータ取得時刻 (レンダー中の Date.now() は純粋性違反)
   const forecast = useMemo(
-    () => computeUmbrellaForecast(models, consensus),
-    [models, consensus]
+    () =>
+      computeUmbrellaForecast(
+        data.models,
+        data.consensus,
+        undefined,
+        data.fetchedAt,
+        data.ensemble
+      ),
+    [data]
   )
 
   const needAny = forecast.ranges.length > 0

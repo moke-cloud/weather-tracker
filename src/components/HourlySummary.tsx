@@ -6,26 +6,35 @@ import { InfoTooltip } from './InfoTooltip'
 
 interface HourlySummaryProps {
   models: ModelForecast[]
+  /** コンセンサス予報 (あれば気温・降水確率の主ソースにする) */
+  consensus?: ModelForecast | null
+  /** 「現在」として使う時刻 (データ取得時刻。レンダー中の Date.now() は不可) */
+  now: number
 }
 
-export function HourlySummary({ models }: HourlySummaryProps) {
-  const now = Date.now()
-  // Use ECMWF for precip probability (JMA returns null), JMA for weather/temp
+export function HourlySummary({ models, consensus, now }: HourlySummaryProps) {
+  // コンセンサス (6モデル加重 + 実測補正) を優先、なければ JMA
   const jma = models.find((m) => m.model === 'JMA')
+  const primary = consensus ?? jma
   const ecmwf = models.find((m) => m.model === 'ECMWF')
-  const probSource = ecmwf ?? models[models.length - 1]
+  const probSource = consensus ?? ecmwf ?? models[models.length - 1]
 
-  if (!jma) return null
+  if (!primary) return null
 
   // Next 24 hours, 1-hour intervals
-  const hours = jma.hourly.filter((h) => {
+  const hours = primary.hourly.filter((h) => {
     const t = new Date(h.time).getTime()
     return t >= now && t <= now + 24 * 3600_000
   })
 
-  // Match probSource hours by time
+  // Match probSource hours by time (コンセンサスは加重平均で小数になるため丸める)
   const probMap = new Map(
-    (probSource?.hourly ?? []).map((h) => [h.time, h.precipitationProbability])
+    (probSource?.hourly ?? []).map((h) => [
+      h.time,
+      h.precipitationProbability != null
+        ? Math.round(h.precipitationProbability)
+        : null,
+    ])
   )
 
   return (
@@ -94,8 +103,8 @@ export function HourlySummary({ models }: HourlySummaryProps) {
                   {prob !== null ? `${prob}%` : '-'}
                 </div>
 
-                {/* Precipitation amount */}
-                {h.precipitation !== null && h.precipitation > 0 && (
+                {/* Precipitation amount (コンセンサスの微小な端数は表示しない) */}
+                {h.precipitation !== null && h.precipitation >= 0.05 && (
                   <div className="nums text-[9px] text-cool">{h.precipitation.toFixed(1)}mm</div>
                 )}
               </div>
@@ -115,8 +124,8 @@ export function HourlySummary({ models }: HourlySummaryProps) {
           <InfoTooltip term="precipProbability" />
         </span>
         <span className="inline-flex items-center gap-1">
-          降水確率の出典: ECMWF
-          <InfoTooltip term="ecmwfIfs" />
+          {consensus ? '出典: コンセンサス予報' : '降水確率の出典: ECMWF'}
+          <InfoTooltip term={consensus ? 'consensusForecast' : 'ecmwfIfs'} />
         </span>
       </div>
     </div>

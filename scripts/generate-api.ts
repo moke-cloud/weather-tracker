@@ -115,7 +115,7 @@ async function buildCity(city: ApiCity): Promise<CityResult> {
   })
 
   const risk = calculateHeadacheRisk(forecast.models, ensemble, { preferred: consensus })
-  const umbrella = computeUmbrellaForecast(forecast.models, consensus)
+  const umbrella = computeUmbrellaForecast(forecast.models, consensus, 48, now, ensemble)
 
   const current =
     hourly.find((h) => Math.abs(new Date(h.time).getTime() - now) <= 30 * 60_000) ??
@@ -160,7 +160,8 @@ async function buildCity(city: ApiCity): Promise<CityResult> {
     },
     forecastSource: {
       blend: CONSENSUS_LABEL,
-      models: ['JMA MSM', 'ECMWF IFS 0.25°', 'GFS'],
+      models: ['JMA MSM', 'ECMWF IFS 0.25°', 'ICON', 'UKMO', 'GFS', 'GEM'],
+      ensembles: ['ECMWF ENS (51)', 'NOAA GEFS (31)'],
       degraded: forecast.status !== 'ok',
     },
   }

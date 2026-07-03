@@ -100,4 +100,29 @@ describe('computeUmbrellaForecast', () => {
     expect(f.ranges[0].level).toBe('fold')
     expect(f.summary).toContain('折りたたみ')
   })
+
+  it('アンサンブル降水確率があれば 0.4:0.6 でブレンドされる', () => {
+    const m = makeModel('JMA', 24, (i) =>
+      i === 2 ? { precipitationProbability: 20 } : {}
+    )
+    // アンサンブル82メンバー中80%が降水 → (20*0.4 + 80*0.6) = 56%
+    const ensemble = [
+      { time: hourTime(2), median: null, p10: null, p90: null, rainProb: 0.8 },
+    ]
+    const f = computeUmbrellaForecast([m], m, 24, NOW, ensemble)
+    const hour = f.hours.find((h) => h.time === hourTime(2))!
+    expect(hour.probability).toBe(56)
+    expect(hour.level).toBe('fold') // 30-59% → fold
+  })
+
+  it('モデル降水確率が無くてもアンサンブルだけで判定できる', () => {
+    const m = makeModel('JMA', 24, () => ({ precipitationProbability: null }))
+    const ensemble = [
+      { time: hourTime(3), median: null, p10: null, p90: null, rainProb: 0.9 },
+    ]
+    const f = computeUmbrellaForecast([m], m, 24, NOW, ensemble)
+    const hour = f.hours.find((h) => h.time === hourTime(3))!
+    expect(hour.probability).toBe(90)
+    expect(hour.level).toBe('umbrella')
+  })
 })

@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { computeSkillsFromEntries, skillsToWeights } from './accuracy'
+import {
+  computeSkillsFromEntries,
+  computeBiasesFromEntries,
+  skillsToWeights,
+} from './accuracy'
 import type { ForecastLogEntry } from './types'
 
 const NOW = new Date('2026-07-03T12:00:00+09:00').getTime()
@@ -75,5 +79,40 @@ describe('computeSkillsFromEntries', () => {
     const skills = computeSkillsFromEntries([old], PRIORS, NOW)
     const gfs = skills.find((s) => s.model === 'GFS')!
     expect(gfs.sampleCount).toBe(0)
+  })
+})
+
+describe('computeBiasesFromEntries', () => {
+  it('直近48hの署名付き平均誤差を系統バイアスとして返す', () => {
+    const entries = Array.from({ length: 6 }, (_, i) =>
+      verifiedEntry('JMA', 1.5, -0.8, i) // 常に気温+1.5℃・気圧-0.8hPaずれる
+    )
+    const biases = computeBiasesFromEntries(entries, NOW)
+    expect(biases.JMA.temp).toBeCloseTo(1.5, 2)
+    expect(biases.JMA.pressure).toBeCloseTo(-0.8, 2)
+  })
+
+  it('サンプル4件未満のモデルはバイアスを出さない', () => {
+    const entries = Array.from({ length: 3 }, (_, i) =>
+      verifiedEntry('GEM', 2, 2, i)
+    )
+    expect(computeBiasesFromEntries(entries, NOW).GEM).toBeUndefined()
+  })
+
+  it('異常なバイアスは上限でクランプされる', () => {
+    const entries = Array.from({ length: 6 }, (_, i) =>
+      verifiedEntry('GFS', 8, 5, i)
+    )
+    const biases = computeBiasesFromEntries(entries, NOW)
+    expect(biases.GFS.temp).toBe(3)
+    expect(biases.GFS.pressure).toBe(2)
+  })
+
+  it('48hより古い照合は使わない', () => {
+    const old = Array.from({ length: 6 }, (_, i) => ({
+      ...verifiedEntry('ICON', 2, 1, i),
+      targetTime: new Date(NOW - 3 * 24 * 3_600_000).toISOString(),
+    }))
+    expect(computeBiasesFromEntries(old, NOW).ICON).toBeUndefined()
   })
 })

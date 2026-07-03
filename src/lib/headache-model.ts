@@ -331,9 +331,11 @@ function scoreModelConsensus(
     }
   }
 
-  // Model agreement: all dropping?
+  // Model agreement: all dropping? (6モデル体制: 過半数低下で someDrop)
   const allDrop = trends.length >= 2 && trends.every(t => t < -1)
-  const someDrop = trends.length >= 2 && trends.filter(t => t < -1).length >= 2
+  const someDrop =
+    trends.length >= 2 &&
+    trends.filter(t => t < -1).length >= Math.max(2, Math.ceil(trends.length / 2))
 
   // Ensemble spread
   const futureEnsemble = ensemble.filter(e => {
@@ -364,7 +366,7 @@ function scoreModelConsensus(
   else if (maxDropProb >= 0.15) score += 10
 
   const desc = [
-    allDrop ? '全モデル気圧低下予測' : someDrop ? '2モデル気圧低下予測' : 'モデル間分岐',
+    allDrop ? '全モデル気圧低下予測' : someDrop ? '過半数モデル気圧低下予測' : 'モデル間分岐',
     maxSpread >= 3 ? `不確実性: ±${(maxSpread / 2).toFixed(1)}hPa` : '',
     maxDropProb >= 0.15 ? `急降下確率 ${(maxDropProb * 100).toFixed(0)}%` : '',
   ].filter(Boolean).join(' / ')

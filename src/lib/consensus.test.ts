@@ -37,20 +37,20 @@ function makeModel(
 describe('effectiveWeights', () => {
   it('短期リードでは既定の短期重み (JMA優位) を返す', () => {
     const w = effectiveWeights(6)
-    expect(w.JMA).toBeCloseTo(0.45)
-    expect(w.ECMWF).toBeCloseTo(0.35)
+    expect(w.JMA).toBeCloseTo(0.3)
+    expect(w.ECMWF).toBeCloseTo(0.2)
   })
 
   it('中期リード (60h以降) では ECMWF 優位に切り替わる', () => {
     const w = effectiveWeights(72)
-    expect(w.ECMWF).toBeCloseTo(0.5)
-    expect(w.JMA).toBeCloseTo(0.25)
+    expect(w.ECMWF).toBeCloseTo(0.28)
+    expect(w.JMA).toBeCloseTo(0.14)
   })
 
   it('遷移帯 (36-60h) では線形にブレンドされる', () => {
     const w = effectiveWeights(48) // 中間点
-    expect(w.JMA).toBeCloseTo((0.45 + 0.25) / 2)
-    expect(w.ECMWF).toBeCloseTo((0.35 + 0.5) / 2)
+    expect(w.JMA).toBeCloseTo((0.3 + 0.14) / 2)
+    expect(w.ECMWF).toBeCloseTo((0.2 + 0.28) / 2)
   })
 
   it('動的重みは短期側を置き換える', () => {
@@ -60,7 +60,7 @@ describe('effectiveWeights', () => {
 })
 
 describe('computeConsensus', () => {
-  it('数値フィールドは重み付き平均になる', () => {
+  it('数値フィールドは重み付き平均になる (欠けたモデル分は再正規化)', () => {
     const models = [
       makeModel('JMA', 3, () => ({ temperature: 20 })),
       makeModel('ECMWF', 3, () => ({ temperature: 24 })),
@@ -69,8 +69,8 @@ describe('computeConsensus', () => {
     const c = computeConsensus(models, null, null, NOW)
     expect(c).not.toBeNull()
     expect(c!.model).toBe(CONSENSUS_LABEL)
-    // 0.45*20 + 0.35*24 + 0.2*30 = 23.4
-    expect(c!.hourly[0].temperature).toBeCloseTo(23.4, 1)
+    // (0.30*20 + 0.20*24 + 0.11*30) / 0.61 = 23.11
+    expect(c!.hourly[0].temperature).toBeCloseTo(23.11, 1)
   })
 
   it('null のモデルは除外し、残りの重みで再正規化する (JMAに降水確率が無いケース)', () => {
@@ -80,8 +80,17 @@ describe('computeConsensus', () => {
       makeModel('GFS', 3, () => ({ precipitationProbability: 80 })),
     ]
     const c = computeConsensus(models, null, null, NOW)
-    // (0.35*60 + 0.2*80) / 0.55 = 67.27
-    expect(c!.hourly[0].precipitationProbability).toBeCloseTo(67.27, 1)
+    // (0.20*60 + 0.11*80) / 0.31 = 67.10
+    expect(c!.hourly[0].precipitationProbability).toBeCloseTo(67.1, 1)
+  })
+
+  it('系統バイアスはブレンド前に予報値から除去される', () => {
+    const models = [makeModel('JMA', 3, () => ({ temperature: 20, pressureMsl: 1012 }))]
+    const c = computeConsensus(models, null, null, NOW, {
+      JMA: { temp: 2, pressure: -1 }, // JMAは気温+2℃高め・気圧1hPa低めに外す癖
+    })
+    expect(c!.hourly[0].temperature).toBeCloseTo(18, 1)
+    expect(c!.hourly[0].pressureMsl).toBeCloseTo(1013, 1)
   })
 
   it('weatherCode は最重みの非nullモデルから採用する', () => {
