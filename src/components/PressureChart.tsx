@@ -8,7 +8,6 @@ import {
   Tooltip,
   ResponsiveContainer,
   ReferenceLine,
-  Legend,
   Label,
 } from 'recharts'
 import type { ModelForecast, EnsembleBand, AmedasObservation } from '../lib/types'
@@ -177,10 +176,8 @@ export function PressureChart({ models, consensus, ensemble, amedas }: PressureC
               `${Number(value).toFixed(1)} hPa`,
             ]}
           />
-          <Legend
-            wrapperStyle={{ fontSize: '11px', color: 'var(--ink-muted)' }}
-            iconType="line"
-          />
+          {/* 凡例はチャート下の自作凡例 (ツールチップ付き) に一本化。
+              Recharts内蔵Legendは8系列で折り返してX軸ラベルと重なるため使わない */}
 
           {/* Ensemble confidence band: P90 を薄塗り → P10 を背景色で抜いて帯を作る */}
           <Area

@@ -103,38 +103,42 @@ export function UmbrellaTimeline({ data }: UmbrellaTimelineProps) {
         </div>
       )}
 
-      {/* 48hタイムラインバー */}
+      {/* 48hタイムラインバー (スクロール不要で全体が見えるよう画面幅に収める) */}
       {forecast.hours.length > 0 && (
-        <div className="overflow-x-auto pb-1">
-          <div className="min-w-[560px]">
-            <div className="flex gap-px">
-              {forecast.hours.map(h => (
-                <div
-                  key={h.time}
-                  title={`${dayLabel(h.time)} ${new Date(h.time).getHours()}時 ${
-                    h.level ? LEVEL_TEXT[h.level] : '傘不要'
-                  }${h.probability != null ? ` / 降水確率${Math.round(h.probability)}%` : ''}`}
-                  className={`h-5 flex-1 rounded-[2px] ${
-                    h.level ? LEVEL_CELL[h.level] : 'bg-surface-sunk'
-                  }`}
-                />
-              ))}
-            </div>
-            <div className="flex mt-1">
-              {forecast.hours.map((h, i) => {
-                const hour = new Date(h.time).getHours()
-                const showLabel = i === 0 || hour % 6 === 0
-                return (
-                  <div key={h.time} className="flex-1 relative">
-                    {showLabel && (
-                      <span className="nums absolute left-0 text-[9px] text-ink-subtle whitespace-nowrap">
-                        {hour === 0 ? dayLabel(h.time) : `${hour}時`}
-                      </span>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
+        <div className="pb-3">
+          <div className="flex gap-px">
+            {forecast.hours.map(h => (
+              <div
+                key={h.time}
+                title={`${dayLabel(h.time)} ${new Date(h.time).getHours()}時 ${
+                  h.level ? LEVEL_TEXT[h.level] : '傘不要'
+                }${h.probability != null ? ` / 降水確率${Math.round(h.probability)}%` : ''}`}
+                className={`h-5 flex-1 rounded-[2px] ${
+                  h.level ? LEVEL_CELL[h.level] : 'bg-surface-sunk'
+                }`}
+              />
+            ))}
+          </div>
+          <div className="flex mt-1">
+            {forecast.hours.map((h, i) => {
+              const hour = new Date(h.time).getHours()
+              // 幅が限られるため12時間ごと+日付変わり目のみラベル表示
+              const showLabel =
+                i === 0 || hour === 0 || hour % 12 === 0
+              return (
+                <div key={h.time} className="flex-1 relative">
+                  {showLabel && (
+                    <span
+                      className={`nums absolute left-0 text-[9px] whitespace-nowrap ${
+                        hour === 0 ? 'font-medium text-ink-muted' : 'text-ink-subtle'
+                      }`}
+                    >
+                      {hour === 0 ? dayLabel(h.time) : `${hour}時`}
+                    </span>
+                  )}
+                </div>
+              )
+            })}
           </div>
         </div>
       )}
