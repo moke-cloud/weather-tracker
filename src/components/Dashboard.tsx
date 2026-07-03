@@ -31,6 +31,7 @@ import { HourlySummary } from './HourlySummary'
 import { PressureChart } from './PressureChart'
 import { ForecastTable } from './ForecastTable'
 import { UmbrellaTimeline } from './UmbrellaTimeline'
+import { RainNowcast } from './RainNowcast'
 import { InfoTooltip } from './InfoTooltip'
 import type { GlossaryKey } from '../lib/glossary'
 
@@ -387,6 +388,14 @@ function TileContent({
   switch (tileId) {
     case 'weather':
       return <WeatherCard amedas={data.amedas} models={data.models} />
+    case 'rain':
+      return (
+        <RainNowcast
+          latitude={data.location.latitude}
+          longitude={data.location.longitude}
+          refreshKey={data.fetchedAt}
+        />
+      )
     case 'headache':
       return <HeadacheRiskPanel data={data} />
     case 'umbrella':
