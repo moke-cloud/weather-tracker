@@ -28,6 +28,8 @@ import type {
 } from './types'
 
 /* ── Factor weights ── */
+// 既定値。headache-personalize.ts が日記から個人化した重みで上書きできる
+// (BASE_WEIGHTS と一致させること)
 
 const W_PRESSURE_RATE  = 0.35   // Primary: pressure change rate [1][3]
 const W_ABSOLUTE_PRESS = 0.08   // Low absolute pressure baseline [7]
@@ -36,7 +38,26 @@ const W_HUMIDITY       = 0.14   // Humidity impact [4][5]
 const W_FRONT          = 0.15   // Weather front detection [6][9]
 const W_ENSEMBLE       = 0.10   // Model agreement + ensemble spread
 
+/** リスク計算オプション */
+export interface RiskOptions {
+  /** factor id → 個人化済み重み (headache-personalize.ts) */
+  weights?: Record<string, number>
+  /** 因子計算の主入力にするモデル (コンセンサス予報を渡す。無指定はJMA) */
+  preferred?: ModelForecast | null
+  /** 個人化の学習に使った日記件数 (UI表示用) */
+  personalBasis?: number | null
+}
+
 /* ── Helpers ── */
+
+/** 因子計算の主入力: コンセンサス予報 > JMA > 先頭モデル */
+function pickPrimary(
+  models: ModelForecast[],
+  preferred?: ModelForecast | null
+): ModelForecast | undefined {
+  if (preferred && preferred.hourly.length > 0) return preferred
+  return models.find(m => m.model === 'JMA') ?? models[0]
+}
 
 function clamp(v: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, v))
@@ -103,9 +124,8 @@ function maxAbsChange(points: TimeValue[], windowHours: number): number {
 }
 
 /* 1. Pressure change rate [1][3] */
-function scorePressureRate(models: ModelForecast[], now: number): HeadacheFactor {
-  // Aggregate pressure data from primary model (JMA), fallback to others
-  const jma = models.find(m => m.model === 'JMA') ?? models[0]
+function scorePressureRate(models: ModelForecast[], now: number, preferred?: ModelForecast | null): HeadacheFactor {
+  const jma = pickPrimary(models, preferred)
   if (!jma) return emptyFactor('pressure_rate', '気圧変化率', W_PRESSURE_RATE)
 
   const window = jma.hourly
@@ -137,8 +157,8 @@ function scorePressureRate(models: ModelForecast[], now: number): HeadacheFactor
 }
 
 /* 2. Absolute pressure level [7] */
-function scoreAbsolutePressure(models: ModelForecast[], now: number): HeadacheFactor {
-  const jma = models.find(m => m.model === 'JMA') ?? models[0]
+function scoreAbsolutePressure(models: ModelForecast[], now: number, preferred?: ModelForecast | null): HeadacheFactor {
+  const jma = pickPrimary(models, preferred)
   const current = jma?.hourly.find(h => h.pressureMsl !== null && Math.abs(new Date(h.time).getTime() - now) < 2 * 3_600_000)
   const p = current?.pressureMsl
 
@@ -164,8 +184,8 @@ function scoreAbsolutePressure(models: ModelForecast[], now: number): HeadacheFa
 }
 
 /* 3. Temperature change [2][8] */
-function scoreTemperatureChange(models: ModelForecast[], now: number): HeadacheFactor {
-  const jma = models.find(m => m.model === 'JMA') ?? models[0]
+function scoreTemperatureChange(models: ModelForecast[], now: number, preferred?: ModelForecast | null): HeadacheFactor {
+  const jma = pickPrimary(models, preferred)
   if (!jma) return emptyFactor('temp_change', '気温変化', W_TEMPERATURE)
 
   const window = jma.hourly
@@ -192,8 +212,8 @@ function scoreTemperatureChange(models: ModelForecast[], now: number): HeadacheF
 }
 
 /* 4. Humidity impact [4][5] */
-function scoreHumidity(models: ModelForecast[], now: number): HeadacheFactor {
-  const jma = models.find(m => m.model === 'JMA') ?? models[0]
+function scoreHumidity(models: ModelForecast[], now: number, preferred?: ModelForecast | null): HeadacheFactor {
+  const jma = pickPrimary(models, preferred)
   if (!jma) return emptyFactor('humidity', '湿度', W_HUMIDITY)
 
   const window = jma.hourly
@@ -230,8 +250,8 @@ function scoreHumidity(models: ModelForecast[], now: number): HeadacheFactor {
 }
 
 /* 5. Weather front detection [6][9] */
-function scoreWeatherFront(models: ModelForecast[], now: number): HeadacheFactor {
-  const jma = models.find(m => m.model === 'JMA') ?? models[0]
+function scoreWeatherFront(models: ModelForecast[], now: number, preferred?: ModelForecast | null): HeadacheFactor {
+  const jma = pickPrimary(models, preferred)
   if (!jma) return emptyFactor('front', '前線通過', W_FRONT)
 
   // Front passage signature: simultaneous pressure drop + temp change + humidity surge
@@ -325,6 +345,13 @@ function scoreModelConsensus(
     return Math.max(max, e.p90 - e.p10)
   }, 0)
 
+  // アンサンブルメンバーの気圧降下確率 (今後6hの最大値)。
+  // 決定論的な低下傾向より早く「急降下の可能性」を捉える確率シグナル
+  const maxDropProb = futureEnsemble.reduce((max, e) => {
+    if (e.dropProb3h == null) return max
+    return Math.max(max, e.dropProb3h)
+  }, 0)
+
   // Wide ensemble spread = uncertainty = possible rapid shift
   let score = 0
   if (allDrop) score += 50
@@ -332,10 +359,14 @@ function scoreModelConsensus(
   if (maxSpread >= 8) score += 50
   else if (maxSpread >= 5) score += 30
   else if (maxSpread >= 3) score += 15
+  if (maxDropProb >= 0.6) score += 40
+  else if (maxDropProb >= 0.3) score += 25
+  else if (maxDropProb >= 0.15) score += 10
 
   const desc = [
     allDrop ? '全モデル気圧低下予測' : someDrop ? '2モデル気圧低下予測' : 'モデル間分岐',
     maxSpread >= 3 ? `不確実性: ±${(maxSpread / 2).toFixed(1)}hPa` : '',
+    maxDropProb >= 0.15 ? `急降下確率 ${(maxDropProb * 100).toFixed(0)}%` : '',
   ].filter(Boolean).join(' / ')
 
   return {
@@ -357,9 +388,13 @@ function emptyFactor(id: string, name: string, weight: number): HeadacheFactor {
    Hourly risk timeline
    ────────────────────────────── */
 
-function computeHourlyRisk(models: ModelForecast[], ensemble: EnsembleBand[]): HourlyRisk[] {
-  const jma = models.find(m => m.model === 'JMA') ?? models[0]
-  if (!jma) return []
+function computeHourlyRisk(
+  models: ModelForecast[],
+  ensemble: EnsembleBand[],
+  opts?: RiskOptions,
+): HourlyRisk[] {
+  const primary = pickPrimary(models, opts?.preferred)
+  if (!primary) return []
 
   const now = Date.now()
   const hours: HourlyRisk[] = []
@@ -369,14 +404,14 @@ function computeHourlyRisk(models: ModelForecast[], ensemble: EnsembleBand[]): H
     const targetStr = new Date(targetTime).toISOString()
 
     // Calculate factors at this specific hour
-    const factors = [
-      scorePressureRate(models, targetTime),
-      scoreAbsolutePressure(models, targetTime),
-      scoreTemperatureChange(models, targetTime),
-      scoreHumidity(models, targetTime),
-      scoreWeatherFront(models, targetTime),
+    const factors = applyWeights([
+      scorePressureRate(models, targetTime, opts?.preferred),
+      scoreAbsolutePressure(models, targetTime, opts?.preferred),
+      scoreTemperatureChange(models, targetTime, opts?.preferred),
+      scoreHumidity(models, targetTime, opts?.preferred),
+      scoreWeatherFront(models, targetTime, opts?.preferred),
       scoreModelConsensus(models, ensemble, targetTime),
-    ]
+    ], opts?.weights)
 
     const weighted = factors.reduce((sum, f) => sum + f.score * f.weight, 0)
     const score = clamp(Math.round(weighted), 0, 100)
@@ -436,20 +471,30 @@ function generateAdvice(level: HeadacheRiskLevel, factors: HeadacheFactor[]): st
    Main API
    ────────────────────────────── */
 
+/** 個人化重みを因子に適用する (未指定の因子は既定重みのまま) */
+function applyWeights(
+  factors: HeadacheFactor[],
+  weights?: Record<string, number>,
+): HeadacheFactor[] {
+  if (!weights) return factors
+  return factors.map(f => ({ ...f, weight: weights[f.id] ?? f.weight }))
+}
+
 export function calculateHeadacheRisk(
   models: ModelForecast[],
   ensemble: EnsembleBand[],
+  opts?: RiskOptions,
 ): HeadacheRiskResult {
   const now = Date.now()
 
-  const factors: HeadacheFactor[] = [
-    scorePressureRate(models, now),
-    scoreAbsolutePressure(models, now),
-    scoreTemperatureChange(models, now),
-    scoreHumidity(models, now),
-    scoreWeatherFront(models, now),
+  const factors: HeadacheFactor[] = applyWeights([
+    scorePressureRate(models, now, opts?.preferred),
+    scoreAbsolutePressure(models, now, opts?.preferred),
+    scoreTemperatureChange(models, now, opts?.preferred),
+    scoreHumidity(models, now, opts?.preferred),
+    scoreWeatherFront(models, now, opts?.preferred),
     scoreModelConsensus(models, ensemble, now),
-  ]
+  ], opts?.weights)
 
   // Weighted sum
   const rawScore = factors.reduce((sum, f) => sum + f.score * f.weight, 0)
@@ -471,7 +516,7 @@ export function calculateHeadacheRisk(
     1,
   )
 
-  const hourlyRisk = computeHourlyRisk(models, ensemble)
+  const hourlyRisk = computeHourlyRisk(models, ensemble, opts)
   const advice = generateAdvice(level, factors)
 
   // Summary
@@ -489,6 +534,7 @@ export function calculateHeadacheRisk(
     confidence,
     advice,
     summary,
+    personalizedBasis: opts?.personalBasis ?? null,
   }
 }
 

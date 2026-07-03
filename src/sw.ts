@@ -1,7 +1,8 @@
 /// <reference lib="webworker" />
 import { getLocations } from './lib/db'
 import { fetchWeatherForLocation } from './lib/weather-service'
-import { calculateHeadacheRisk } from './lib/headache-model'
+import { computeRiskForData } from './lib/risk-service'
+import type { HeadacheRiskResult } from './lib/types'
 import { getNotifState, setNotifState, passesCooldown, SEVERITY } from './lib/notif-store'
 import { buildNotification } from './lib/notif-content'
 
@@ -117,12 +118,13 @@ async function runHeadacheCheck(): Promise<void> {
   const locations = await getLocations()
   if (locations.length === 0) return
 
-  let top: { level: ReturnType<typeof calculateHeadacheRisk>['level']; label: string; summary: string; sev: number } | null = null
+  let top: { level: HeadacheRiskResult['level']; label: string; summary: string; sev: number } | null = null
 
   for (const loc of locations) {
     try {
       const data = await fetchWeatherForLocation(loc)
-      const risk = calculateHeadacheRisk(data.models, data.ensemble)
+      // コンセンサス予報 + 日記個人化を適用 (ページ側と同一の共通計算)
+      const risk = await computeRiskForData(data)
       const sev = SEVERITY[risk.level]
       if (!top || sev > top.sev) {
         top = { level: risk.level, label: risk.label, summary: `${loc.name}: ${risk.summary}`, sev }

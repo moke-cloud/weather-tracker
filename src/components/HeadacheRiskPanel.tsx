@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect, useMemo } from 'react'
 import {
   AreaChart,
   Area,
@@ -10,14 +10,14 @@ import {
   Label,
 } from 'recharts'
 import type {
-  ModelForecast,
-  EnsembleBand,
+  LocationWeather,
   HeadacheRiskResult,
   HeadacheRiskLevel,
   DiaryEntry,
   HeadacheFactor,
 } from '../lib/types'
 import { calculateHeadacheRisk } from '../lib/headache-model'
+import { computeRiskForData } from '../lib/risk-service'
 import { addDiaryEntry } from '../lib/diary'
 import { InfoTooltip } from './InfoTooltip'
 import { StatusDot } from './icons'
@@ -32,8 +32,7 @@ const LEVEL_DOT: Record<HeadacheRiskLevel, string> = {
 }
 
 interface HeadacheRiskPanelProps {
-  models: ModelForecast[]
-  ensemble: EnsembleBand[]
+  data: LocationWeather
 }
 
 const LEVEL_STYLES: Record<
@@ -159,24 +158,48 @@ const LEVEL_DEFINITIONS: Array<{
   },
 ]
 
-export function HeadacheRiskPanel({ models, ensemble }: HeadacheRiskPanelProps) {
+export function HeadacheRiskPanel({ data }: HeadacheRiskPanelProps) {
+  const { models, ensemble, consensus } = data
   const [showDetail, setShowDetail] = useState(false)
   const [showInfoModal, setShowInfoModal] = useState(false)
   const [diaryLogged, setDiaryLogged] = useState(false)
   const [diaryError, setDiaryError] = useState(false)
 
-  const risk: HeadacheRiskResult = calculateHeadacheRisk(models, ensemble)
+  // 即描画のため既定重みで同期計算し、日記の個人化重みが読めたら差し替える。
+  // 個人化結果は元データとペアで保持し、data が変わった瞬間は既定計算に戻す
+  const defaultRisk = useMemo(
+    () => calculateHeadacheRisk(models, ensemble, { preferred: consensus }),
+    [models, ensemble, consensus]
+  )
+  const [personal, setPersonal] = useState<{
+    source: LocationWeather
+    result: HeadacheRiskResult
+  } | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    computeRiskForData(data).then(result => {
+      if (!cancelled) setPersonal({ source: data, result })
+    }).catch(() => {
+      // 個人化に失敗しても既定重みの結果を表示し続ける
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [data])
+  const risk = personal?.source === data ? personal.result : defaultRisk
+
   const style = LEVEL_STYLES[risk.level]
 
-  // Find current conditions from JMA model
-  const jma = models.find(m => m.model === 'JMA')
-  const now = Date.now()
-  const currentHour = jma?.hourly.find(h =>
+  // 現在条件はコンセンサス予報 (AMeDAS補正済) を優先。
+  // 「現在」はデータ取得時刻を使う (レンダー中の Date.now() は純粋性違反)
+  const primary = consensus ?? models.find(m => m.model === 'JMA')
+  const now = data.fetchedAt
+  const currentHour = primary?.hourly.find(h =>
     h.pressureMsl !== null && Math.abs(new Date(h.time).getTime() - now) < 2 * 3_600_000
   )
 
   // Compute 3h pressure change for diary
-  const threeHoursAgo = jma?.hourly.find(h => {
+  const threeHoursAgo = primary?.hourly.find(h => {
     if (h.pressureMsl === null) return false
     const diff = now - new Date(h.time).getTime()
     return diff >= 2.5 * 3_600_000 && diff <= 3.5 * 3_600_000
@@ -224,6 +247,12 @@ export function HeadacheRiskPanel({ models, ensemble }: HeadacheRiskPanelProps) 
           </button>
         </h3>
         <div className="flex items-center gap-2">
+          {risk.personalizedBasis != null && (
+            <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-accent-soft text-accent-strong font-medium">
+              <span className="nums">個人化 {risk.personalizedBasis}件</span>
+              <InfoTooltip term="personalizedRisk" />
+            </span>
+          )}
           <span className="inline-flex items-center gap-1 text-xs text-ink-subtle">
             <span className="nums">信頼度 {Math.round(risk.confidence * 100)}%</span>
             <InfoTooltip term="headacheConfidence" />

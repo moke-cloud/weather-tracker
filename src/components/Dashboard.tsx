@@ -14,11 +14,13 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import type { LocationWeather } from '../lib/types'
+import type { LocationWeather, ModelSkill } from '../lib/types'
 import { fetchWeatherForLocation } from '../lib/weather-service'
 import type { Location } from '../lib/types'
 import { useTileOrder, TILE_LABELS, type TileId } from '../lib/tile-order'
-import { calculateHeadacheRisk } from '../lib/headache-model'
+import { computeRiskForData } from '../lib/risk-service'
+import { getModelSkills } from '../lib/accuracy'
+import { CONSENSUS_LABEL } from '../lib/consensus'
 import { maybeNotify } from '../lib/notifications'
 import { WeatherCard } from './WeatherCard'
 import { WeatherIcon } from './WeatherIcon'
@@ -28,6 +30,7 @@ import { HeadacheDiary } from './HeadacheDiary'
 import { HourlySummary } from './HourlySummary'
 import { PressureChart } from './PressureChart'
 import { ForecastTable } from './ForecastTable'
+import { UmbrellaTimeline } from './UmbrellaTimeline'
 import { InfoTooltip } from './InfoTooltip'
 import type { GlossaryKey } from '../lib/glossary'
 
@@ -35,6 +38,7 @@ const MODEL_TERM: Record<string, GlossaryKey> = {
   JMA: 'jmaMsm',
   ECMWF: 'ecmwfIfs',
   GFS: 'gfs',
+  [CONSENSUS_LABEL]: 'consensusForecast',
 }
 
 const AUTO_REFRESH_MS = 10 * 60_000 // 10 minutes
@@ -82,7 +86,8 @@ export function Dashboard({ locations, onRemoveLocation }: DashboardProps) {
       setWeatherData(prev => new Map(prev).set(location.id, data))
 
       // Check headache notification (開いている間の通知。閉じている間は sw.ts が担当)
-      const risk = calculateHeadacheRisk(data.models, data.ensemble)
+      // コンセンサス予報 + 日記個人化を適用した共通計算を使う
+      const risk = await computeRiskForData(data)
       await maybeNotify(risk.level, risk.label, risk.summary)
     } catch (err) {
       setErrors(prev =>
@@ -263,6 +268,30 @@ export function Dashboard({ locations, onRemoveLocation }: DashboardProps) {
               </div>
             )}
 
+            {data?.stale && (
+              <div className="rounded-lg bg-caution-soft p-3 mb-3 text-sm text-ink flex items-start gap-2">
+                <span className="font-semibold shrink-0">オフライン表示:</span>
+                <span className="text-ink-muted">
+                  天気APIに接続できないため、
+                  {new Date(data.fetchedAt).toLocaleString('ja-JP', {
+                    month: 'numeric',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                  時点の最終取得データを表示しています。
+                </span>
+              </div>
+            )}
+
+            {data && !data.stale && data.sources && hasDegradedSource(data.sources) && (
+              <div className="rounded-lg bg-surface p-2.5 mb-3 border border-line text-xs text-ink-muted">
+                一部のデータソースが応答していません:{' '}
+                {describeDegradedSources(data.sources)}
+                。取得できた範囲で表示しています。
+              </div>
+            )}
+
             {data && (
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                 <SortableContext items={order} strategy={verticalListSortingStrategy}>
@@ -356,7 +385,9 @@ function TileContent({
     case 'weather':
       return <WeatherCard amedas={data.amedas} models={data.models} />
     case 'headache':
-      return <HeadacheRiskPanel models={data.models} ensemble={data.ensemble} />
+      return <HeadacheRiskPanel data={data} />
+    case 'umbrella':
+      return <UmbrellaTimeline models={data.models} consensus={data.consensus} />
     case 'hourly':
       return <HourlySummary models={data.models} />
     case 'forecast':
@@ -388,7 +419,7 @@ function TileContent({
           isOpen={expandedSections.has(`models_${locId}`)}
           onToggle={() => toggleSection(`models_${locId}`)}
         >
-          <ModelComparisonInfo models={data.models} />
+          <ModelComparisonInfo models={data.models} consensus={data.consensus} />
         </CollapsibleSection>
       )
     case 'diary':
@@ -431,13 +462,42 @@ function CollapsibleSection({
   )
 }
 
+/* ── Availability helpers ── */
+
+function hasDegradedSource(sources: NonNullable<LocationWeather['sources']>): boolean {
+  return (
+    sources.forecast !== 'ok' ||
+    sources.ensemble !== 'ok' ||
+    sources.airQuality !== 'ok' ||
+    sources.amedas !== 'ok'
+  )
+}
+
+function describeDegradedSources(
+  sources: NonNullable<LocationWeather['sources']>
+): string {
+  const parts: string[] = []
+  if (sources.forecast === 'partial') parts.push('予報 (一部モデルのみ)')
+  if (sources.ensemble === 'error') parts.push('アンサンブル')
+  if (sources.airQuality === 'error') parts.push('大気質')
+  if (sources.amedas === 'error') parts.push('AMeDAS実測')
+  return parts.join('・')
+}
+
 /* ── Model comparison table ── */
 
-function ModelComparisonInfo({ models }: { models: LocationWeather['models'] }) {
+function ModelComparisonInfo({
+  models,
+  consensus,
+}: {
+  models: LocationWeather['models']
+  consensus: LocationWeather['consensus']
+}) {
   const now = new Date()
   const hours = [0, 3, 6, 9, 12, 15, 18, 21, 24].map(
     offset => new Date(now.getTime() + offset * 3600_000)
   )
+  const rows = consensus ? [consensus, ...models] : models
 
   return (
     <div className="p-4 pt-0">
@@ -454,7 +514,7 @@ function ModelComparisonInfo({ models }: { models: LocationWeather['models'] }) 
             </tr>
           </thead>
           <tbody>
-            {models.map(m => (
+            {rows.map(m => (
               <tr key={m.model} className="border-b border-line/60">
                 <td className="py-1.5 px-2 text-ink">
                   <span className="inline-flex items-center gap-1">
@@ -485,6 +545,52 @@ function ModelComparisonInfo({ models }: { models: LocationWeather['models'] }) 
         数値は予報気温(℃)。モデル間の温度差が大きいほど予報の不確実性が高い
         <InfoTooltip term="modelDivergence" />
       </p>
+      <ModelSkillFooter />
+    </div>
+  )
+}
+
+/* ── Model verification skill (MAE vs AMeDAS) ── */
+
+function ModelSkillFooter() {
+  const [skills, setSkills] = useState<ModelSkill[]>([])
+
+  useEffect(() => {
+    let cancelled = false
+    getModelSkills().then(s => {
+      if (!cancelled) setSkills(s)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const verified = skills.filter(s => s.sampleCount > 0)
+  if (verified.length === 0) {
+    return (
+      <p className="text-[10px] text-ink-subtle mt-2">
+        実測との照合データを蓄積中。予報と AMeDAS 実測の照合が進むと、
+        精度の良いモデルの重みが自動的に増えます。
+      </p>
+    )
+  }
+
+  return (
+    <div className="mt-3 pt-2 border-t border-line">
+      <p className="inline-flex items-center gap-1 text-[10px] font-medium text-ink-muted mb-1">
+        実測との照合成績 (直近7日・小さいほど正確)
+        <InfoTooltip term="modelSkill" />
+      </p>
+      <div className="flex flex-wrap gap-x-4 gap-y-1">
+        {skills.map(s => (
+          <span key={s.model} className="nums text-[10px] text-ink-muted">
+            <span className="font-medium text-ink">{s.model}</span>
+            {s.maeTemp != null && ` 気温±${s.maeTemp.toFixed(1)}℃`}
+            {s.maePressure != null && ` 気圧±${s.maePressure.toFixed(1)}hPa`}
+            {` (重み${Math.round(s.weight * 100)}%)`}
+          </span>
+        ))}
+      </div>
     </div>
   )
 }

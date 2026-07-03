@@ -4,6 +4,9 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  schedule:
+    # 毎時7分: 公開API (api/v1/*.json) のデータを更新して再デプロイ
+    - cron: '7 * * * *'
 
 permissions:
   contents: read
@@ -24,7 +27,12 @@ jobs:
           node-version: '20'
           cache: npm
       - run: npm ci
+      - run: npm test
       - run: npm run build
+      # 公開API生成は dist を空にする vite build の後に実行する
+      - run: npm run build:api
+        env:
+          TZ: Asia/Tokyo
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

@@ -42,6 +42,8 @@ export interface EnsembleBand {
   median: number | null
   p10: number | null
   p90: number | null
+  /** この時刻から3時間以内に1.5hPa以上気圧が下がるメンバーの割合 (0-1) */
+  dropProb3h?: number | null
 }
 
 export interface AirQualityData {
@@ -62,14 +64,28 @@ export interface DailyForecast {
   uvIndexMax: number | null
 }
 
+/** 各データソースの取得結果 (可用性ステータス表示用) */
+export interface SourceStatus {
+  /** ok=3モデル取得 / partial=一部モデルのみ / error=全滅 */
+  forecast: 'ok' | 'partial' | 'error'
+  ensemble: 'ok' | 'error'
+  airQuality: 'ok' | 'error'
+  amedas: 'ok' | 'error'
+}
+
 export interface LocationWeather {
   location: Location
   amedas: AmedasObservation | null
   models: ModelForecast[]
+  /** マルチモデル加重平均 + AMeDAS実測バイアス補正のコンセンサス予報 */
+  consensus: ModelForecast | null
   ensemble: EnsembleBand[]
   airQuality: AirQualityData | null
   daily: DailyForecast[]
   fetchedAt: number
+  /** true = 全ソース失敗時にキャッシュから復元した古いデータ */
+  stale?: boolean
+  sources?: SourceStatus
 }
 
 export interface GeoSearchResult {
@@ -108,6 +124,79 @@ export interface HeadacheRiskResult {
   confidence: number
   advice: string[]
   summary: string
+  /** 個人化に使った日記件数 (null = 既定重みで計算) */
+  personalizedBasis?: number | null
+}
+
+/* ── Umbrella forecast ── */
+
+/** fold=折りたたみで十分 / umbrella=傘必須 / strong=強雨・強風 (しっかりした傘+注意) */
+export type UmbrellaLevel = 'fold' | 'umbrella' | 'strong'
+
+export interface UmbrellaRange {
+  /** ISO時刻 (レンジ開始・この時間を含む) */
+  start: string
+  /** ISO時刻 (レンジ終了・この時間を含む) */
+  end: string
+  level: UmbrellaLevel
+  maxProbability: number
+  maxPrecipitation: number
+  /** モデル間合意度 0-1 (雨を予測するモデルの割合の平均) */
+  confidence: number
+}
+
+export interface UmbrellaHour {
+  time: string
+  level: UmbrellaLevel | null
+  probability: number | null
+  precipitation: number | null
+  confidence: number
+}
+
+export interface UmbrellaForecast {
+  hours: UmbrellaHour[]
+  ranges: UmbrellaRange[]
+  summary: string
+}
+
+/* ── Forecast verification (accuracy tracking) ── */
+
+/** 予報時点で記録し、実測が入り次第照合するログエントリ */
+export interface ForecastLogEntry {
+  /** `${locationId}|${model}|${targetTime}` */
+  key: string
+  locationId: string
+  model: string
+  /** 予報対象時刻 (ISO) */
+  targetTime: string
+  issuedAt: number
+  predictedTemp: number | null
+  predictedPressure: number | null
+  /** 照合済み実測値 (未照合は null) */
+  observedTemp: number | null
+  observedPressure: number | null
+  verifiedAt: number | null
+}
+
+/** モデルごとの直近検証成績 */
+export interface ModelSkill {
+  model: string
+  sampleCount: number
+  maeTemp: number | null
+  maePressure: number | null
+  /** 検証成績から算出した合成重み (全モデル合計1) */
+  weight: number
+}
+
+/* ── Headache personalization ── */
+
+export interface PersonalWeights {
+  /** factor id → 倍率適用済みの正規化ウェイト */
+  weights: Record<string, number>
+  /** 学習に使った日記件数 */
+  basis: number
+  /** ユーザー向け説明 (どの因子に敏感か) */
+  notes: string[]
 }
 
 /* ── Headache diary ── */

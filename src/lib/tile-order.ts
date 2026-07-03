@@ -18,6 +18,7 @@ import { useState, useCallback } from 'react'
 export type TileId =
   | 'weather'
   | 'headache'
+  | 'umbrella'
   | 'hourly'
   | 'forecast'
   | 'pressure'
@@ -28,6 +29,7 @@ export type TileId =
 export const TILE_LABELS: Record<TileId, string> = {
   weather: '現在の天気',
   headache: '頭痛リスク予測',
+  umbrella: '傘予報',
   hourly: '時間ごと予報',
   forecast: '週間予報',
   pressure: '気圧トレンド・アンサンブル',
@@ -36,9 +38,12 @@ export const TILE_LABELS: Record<TileId, string> = {
   diary: '頭痛日記',
 }
 
+// 既存ユーザーの保存済み並び順には 'umbrella' が無いが、
+// loadOrder() が不足タイルを末尾に自動追加するため安全 (上の注意事項2)
 const DEFAULT_ORDER: TileId[] = [
   'weather',
   'headache',
+  'umbrella',
   'hourly',
   'forecast',
   'pressure',
