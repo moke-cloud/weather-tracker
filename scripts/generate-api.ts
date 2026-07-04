@@ -23,10 +23,21 @@ import { calculateHeadacheRisk } from '../src/lib/headache-model'
 import { computeUmbrellaForecast } from '../src/lib/umbrella'
 import type { AmedasObservation, HourlyPoint } from '../src/lib/types'
 import { API_CITIES, type ApiCity } from './api-cities'
+import {
+  fetchPreviousEnvelope,
+  resolveFallbacks,
+  orderSummaries,
+  type StaleCity,
+} from './api-fallback'
+import type { Envelope } from './api-envelope'
 
 const OUT_DIR = process.env.OUT_DIR ?? join('dist', 'api')
 const API_VERSION = 'v1'
-const BASE_URL = 'https://moke-cloud.github.io/weather-tracker/api/v1'
+// stale フォールバックの取得元にもなる。ローカル検証などで本番 Pages を
+// 参照したくない場合は PUBLIC_BASE_URL で差し替える
+const BASE_URL =
+  process.env.PUBLIC_BASE_URL ??
+  'https://moke-cloud.github.io/weather-tracker/api/v1'
 const DOCS_URL = 'https://github.com/moke-cloud/weather-tracker/blob/main/API.md'
 const ATTRIBUTION = [
   'Weather data by Open-Meteo.com (CC BY 4.0)',
@@ -37,18 +48,10 @@ const ATTRIBUTION = [
 const CONCURRENCY = 4
 /** 公開APIに含める時間別予報の長さ */
 const HOURLY_HORIZON_H = 48
-
-interface Envelope<T> {
-  success: boolean
-  data: T | null
-  error: string | null
-  meta: {
-    generatedAt: string
-    version: string
-    attribution: string[]
-    [key: string]: unknown
-  }
-}
+/** 失敗都市を再試行するまでの待機時間 (一時的な上流障害の回復待ち) */
+const RETRY_DELAY_MS = 60_000
+/** 前回配信データ取得の同時リクエスト数 (GitHub Pages 向け) */
+const FALLBACK_CONCURRENCY = 8
 
 function envelope<T>(data: T, extraMeta: Record<string, unknown> = {}): Envelope<T> {
   return {
@@ -204,25 +207,78 @@ async function mapWithConcurrency<T, R>(
   return results
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+/** 全都市を生成し、成功分と失敗都市に振り分ける */
+async function buildCities(
+  cities: ApiCity[]
+): Promise<{ ok: CityResult[]; failed: ApiCity[] }> {
+  const results = await mapWithConcurrency(cities, CONCURRENCY, buildCity)
+  const ok: CityResult[] = []
+  const failed: ApiCity[] = []
+  results.forEach((r, i) => {
+    if (r.status === 'fulfilled') ok.push(r.value)
+    else {
+      failed.push(cities[i])
+      console.error(`  失敗: ${cities[i].slug}:`, r.reason)
+    }
+  })
+  return { ok, failed }
+}
+
 async function main() {
   const cityDir = join(OUT_DIR, API_VERSION, 'cities')
   await mkdir(cityDir, { recursive: true })
 
   console.log(`公開API生成開始: ${API_CITIES.length}都市 → ${OUT_DIR}/${API_VERSION}`)
-  const results = await mapWithConcurrency(API_CITIES, CONCURRENCY, buildCity)
+  const pass1 = await buildCities(API_CITIES)
+  const ok = [...pass1.ok]
+  let failedCities = pass1.failed
 
-  const ok: CityResult[] = []
-  const failed: string[] = []
-  results.forEach((r, i) => {
-    if (r.status === 'fulfilled') ok.push(r.value)
-    else {
-      failed.push(API_CITIES[i].slug)
-      console.error(`  失敗: ${API_CITIES[i].slug}:`, r.reason)
+  // 一時的な上流障害の回復を待って、失敗した都市だけ再試行する
+  if (failedCities.length > 0) {
+    console.log(
+      `再試行: ${failedCities.length}都市 (${RETRY_DELAY_MS / 1000}秒待機後)`
+    )
+    await sleep(RETRY_DELAY_MS)
+    const pass2 = await buildCities(failedCities)
+    ok.push(...pass2.ok)
+    failedCities = pass2.failed
+  }
+
+  // 再試行しても失敗した都市は、公開中の前回配信データを stale として再配信する。
+  // vite build で dist が空になるため、これをしないと失敗都市の JSON が 404 になる。
+  let stale: StaleCity<ApiCity>[] = []
+  if (failedCities.length > 0) {
+    console.log(
+      `前回配信データへフォールバック: ${failedCities.map((c) => c.slug).join(', ')}`
+    )
+    const fallbacks = await mapWithConcurrency(
+      failedCities,
+      FALLBACK_CONCURRENCY,
+      (city) => fetchPreviousEnvelope(BASE_URL, city.slug)
+    )
+    const resolved = resolveFallbacks(
+      failedCities,
+      fallbacks.map((r) => (r.status === 'fulfilled' ? r.value : null)),
+      BASE_URL,
+      new Date().toISOString()
+    )
+    stale = resolved.stale
+
+    // 新規生成も前回データ取得もできない都市があればデプロイを中止する。
+    // 欠落したままデプロイすると該当都市のエンドポイントが 404 になるため、
+    // 前回のデプロイ結果を丸ごと維持する方が安全。
+    // トレードオフ: 前回データの無い新規都市が1つでもあると全都市の更新が
+    // 止まる (追加直後の1時間だけの既知の挙動として許容する)。
+    if (resolved.missing.length > 0) {
+      throw new Error(
+        `新規生成も前回データの取得もできない都市があります (${resolved.missing.join(', ')})。` +
+          'デプロイを中止し、前回の結果を維持します。'
+      )
     }
-  })
-
-  if (ok.length === 0) {
-    throw new Error('全都市の生成に失敗しました。前回のデプロイ結果が維持されます。')
   }
 
   for (const { city, payload } of ok) {
@@ -232,14 +288,23 @@ async function main() {
       'utf8'
     )
   }
+  for (const { city, env } of stale) {
+    await writeFile(join(cityDir, `${city.slug}.json`), JSON.stringify(env), 'utf8')
+  }
+
+  // all.json は API_CITIES の定義順で並べる (fresh/stale が混ざっても安定させる)
+  const summaries = orderSummaries(API_CITIES, [
+    ...ok.map((r) => ({ slug: r.city.slug, summary: r.summary })),
+    ...stale.map((s) => ({ slug: s.city.slug, summary: s.summary })),
+  ])
 
   await writeFile(
     join(OUT_DIR, API_VERSION, 'all.json'),
     JSON.stringify(
-      envelope(
-        ok.map((r) => r.summary),
-        { total: ok.length, failedCities: failed }
-      )
+      envelope(summaries, {
+        total: summaries.length,
+        staleCities: stale.map((s) => s.city.slug),
+      })
     ),
     'utf8'
   )
@@ -268,9 +333,9 @@ async function main() {
     'utf8'
   )
 
-  console.log(`生成完了: 成功 ${ok.length} / 失敗 ${failed.length}`)
-  if (failed.length > 0) {
-    console.log(`  失敗都市: ${failed.join(', ')}`)
+  console.log(`生成完了: 新規 ${ok.length} / 前回データ再配信 ${stale.length}`)
+  if (stale.length > 0) {
+    console.log(`  stale都市: ${stale.map((s) => s.city.slug).join(', ')}`)
   }
 }
 

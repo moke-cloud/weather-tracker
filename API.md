@@ -83,6 +83,14 @@ https://moke-cloud.github.io/weather-tracker/api/v1
 | `meta.generatedAt` | string | 生成時刻 (**UTC**, ISO 8601) |
 | `meta.version` | string | APIバージョン |
 | `meta.attribution` | string[] | 帰属表示 (§9参照) |
+| `meta.stale` | boolean? | `true` の場合、上流 (Open-Meteo) 障害のため前回生成分を再配信中。データの生成時刻は `meta.generatedAt` のまま |
+| `meta.staleServedAt` | string? | stale 再配信を行った時刻 (**UTC**, ISO 8601)。`meta.stale` が `true` のときのみ |
+
+> **stale 再配信について**: 上流APIの一時障害時でもエンドポイントが404にならないよう、
+> 該当都市は前回配信分をそのまま再配信します。鮮度が重要な用途では
+> `meta.stale` と `meta.generatedAt` を確認してください。
+> `all.json` では `meta.staleCities` (string[]) に対象都市の slug 一覧が入り、
+> 各サマリー要素にも `stale: true` が付きます。
 
 ## 5. 都市詳細のフィールドリファレンス
 
@@ -258,6 +266,7 @@ for city in body["data"]:
 
 - 毎時7分頃に生成ジョブが起動し、数分後に全ファイルが更新されます
 - レスポンスの鮮度は `meta.generatedAt` で確認してください (最大約1時間前)
+- 上流API障害時は前回生成分を再配信します (`meta.stale: true`、§4参照)。その間 `meta.generatedAt` はさらに古くなります
 - クライアント側は**10分以上のキャッシュを推奨**します (それより短い間隔でポーリングしても内容は変わりません)
 
 ## 11. 制約・免責
