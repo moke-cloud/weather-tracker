@@ -84,7 +84,7 @@ export function InfoTooltip({
         onBlur={() => setOpen(false)}
         aria-label={`${content.title} の説明を表示`}
         aria-expanded={open}
-        className={`inline-flex items-center justify-center w-4 h-4 rounded-full border border-current opacity-60 hover:opacity-100 focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-accent transition-opacity ${className}`}
+        className={`inline-flex items-center justify-center w-4 h-4 rounded-full border border-current opacity-75 hover:opacity-100 focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-accent transition-opacity ${className}`}
       >
         <span className="text-[9px] font-bold leading-none select-none">i</span>
       </button>

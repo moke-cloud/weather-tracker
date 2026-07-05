@@ -39,29 +39,35 @@ export interface Sky {
 /**
  * 局面 × 条件 → グラデーション。
  * 上段 = 空の高い方の色、下段 = 地平線寄りの色。160deg で上→下に流す。
+ *
+ * コントラスト制約 (WCAG AA):
+ * - textOn 'dark' (白文字を乗せる面) は全ストップ L <= 0.54。
+ *   white/90 の 12px ラベルが最も明るいストップ上でも 4.5:1 を維持できる上限。
+ * - textOn 'light' (濃い文字を乗せる面) は全ストップ L >= 0.74。
+ *   sky-ink/85 が 4.5:1 を維持できる下限。
  */
 const SKY_TABLE: Record<DayPhase, Record<SkyCondition, Sky>> = {
   dawn: {
     clear:  { gradient: g('oklch(0.86 0.075 250)', 'oklch(0.88 0.07 70)'),  textOn: 'light' },
     partly: { gradient: g('oklch(0.84 0.05 248)',  'oklch(0.89 0.05 75)'),  textOn: 'light' },
     cloudy: { gradient: g('oklch(0.80 0.025 255)', 'oklch(0.85 0.03 70)'),  textOn: 'light' },
-    rain:   { gradient: g('oklch(0.66 0.03 252)',  'oklch(0.72 0.03 250)'), textOn: 'dark'  },
+    rain:   { gradient: g('oklch(0.46 0.03 252)',  'oklch(0.52 0.03 250)'), textOn: 'dark'  },
     snow:   { gradient: g('oklch(0.89 0.015 245)', 'oklch(0.93 0.012 70)'), textOn: 'light' },
-    storm:  { gradient: g('oklch(0.52 0.04 270)',  'oklch(0.58 0.05 60)'),  textOn: 'dark'  },
+    storm:  { gradient: g('oklch(0.46 0.04 270)',  'oklch(0.52 0.05 60)'),  textOn: 'dark'  },
   },
   day: {
     clear:  { gradient: g('oklch(0.74 0.115 240)', 'oklch(0.90 0.05 230)'), textOn: 'light' },
     partly: { gradient: g('oklch(0.78 0.07 242)',  'oklch(0.91 0.035 235)'),textOn: 'light' },
     cloudy: { gradient: g('oklch(0.78 0.022 250)', 'oklch(0.86 0.018 245)'),textOn: 'light' },
-    rain:   { gradient: g('oklch(0.60 0.03 252)',  'oklch(0.69 0.028 250)'),textOn: 'dark'  },
+    rain:   { gradient: g('oklch(0.46 0.03 252)',  'oklch(0.52 0.028 250)'),textOn: 'dark'  },
     snow:   { gradient: g('oklch(0.90 0.014 240)', 'oklch(0.95 0.008 235)'),textOn: 'light' },
-    storm:  { gradient: g('oklch(0.46 0.04 268)',  'oklch(0.55 0.04 258)'), textOn: 'dark'  },
+    storm:  { gradient: g('oklch(0.44 0.04 268)',  'oklch(0.52 0.04 258)'), textOn: 'dark'  },
   },
   dusk: {
-    clear:  { gradient: g('oklch(0.58 0.10 285)',  'oklch(0.76 0.12 52)'),  textOn: 'dark'  },
-    partly: { gradient: g('oklch(0.60 0.075 282)', 'oklch(0.74 0.10 56)'),  textOn: 'dark'  },
-    cloudy: { gradient: g('oklch(0.56 0.03 275)',  'oklch(0.66 0.045 60)'), textOn: 'dark'  },
-    rain:   { gradient: g('oklch(0.48 0.03 270)',  'oklch(0.56 0.04 290)'), textOn: 'dark'  },
+    clear:  { gradient: g('oklch(0.46 0.10 285)',  'oklch(0.54 0.12 52)'),  textOn: 'dark'  },
+    partly: { gradient: g('oklch(0.48 0.075 282)', 'oklch(0.54 0.10 56)'),  textOn: 'dark'  },
+    cloudy: { gradient: g('oklch(0.46 0.03 275)',  'oklch(0.52 0.045 60)'), textOn: 'dark'  },
+    rain:   { gradient: g('oklch(0.44 0.03 270)',  'oklch(0.52 0.04 290)'), textOn: 'dark'  },
     snow:   { gradient: g('oklch(0.74 0.02 255)',  'oklch(0.82 0.025 65)'), textOn: 'light' },
     storm:  { gradient: g('oklch(0.40 0.045 280)', 'oklch(0.50 0.05 300)'), textOn: 'dark'  },
   },

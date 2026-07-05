@@ -62,18 +62,18 @@ export function formatDateTime(isoString: string): string {
 /** 健康影響度のトークン色 (semantic)。値が大きいほど危険側 */
 export function uvLevel(index: number | null): { label: string; color: string } {
   if (index === null) return { label: '--', color: 'text-ink-subtle' }
-  if (index < 3) return { label: '弱い', color: 'text-safe' }
-  if (index < 6) return { label: '中程度', color: 'text-caution' }
-  if (index < 8) return { label: '強い', color: 'text-warn' }
+  if (index < 3) return { label: '弱い', color: 'text-safe-text' }
+  if (index < 6) return { label: '中程度', color: 'text-caution-text' }
+  if (index < 8) return { label: '強い', color: 'text-warn-text' }
   if (index < 11) return { label: '非常に強い', color: 'text-danger' }
   return { label: '極端', color: 'text-danger' }
 }
 
 export function aqiLevel(aqi: number | null): { label: string; color: string } {
   if (aqi === null) return { label: '--', color: 'text-ink-subtle' }
-  if (aqi <= 50) return { label: '良好', color: 'text-safe' }
-  if (aqi <= 100) return { label: '普通', color: 'text-caution' }
-  if (aqi <= 150) return { label: '敏感な人に不健康', color: 'text-warn' }
+  if (aqi <= 50) return { label: '良好', color: 'text-safe-text' }
+  if (aqi <= 100) return { label: '普通', color: 'text-caution-text' }
+  if (aqi <= 150) return { label: '敏感な人に不健康', color: 'text-warn-text' }
   if (aqi <= 200) return { label: '不健康', color: 'text-danger' }
   return { label: '非常に不健康', color: 'text-danger' }
 }

@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { searchLocation, type GeoResult } from '../lib/open-meteo'
 import { fetchAmedasStations, findNearestStation } from '../lib/amedas'
 import { lookupPostalCode } from '../lib/postal-code'
@@ -21,8 +21,18 @@ export function LocationSearch({ onAdd, onClose }: LocationSearchProps) {
   const [results, setResults] = useState<GeoResult[]>([])
   const [searching, setSearching] = useState(false)
   const [gpsLoading, setGpsLoading] = useState(false)
+  const [gpsError, setGpsError] = useState('')
   const [expandedCity, setExpandedCity] = useState<string | null>(null)
   const [searchMode, setSearchMode] = useState<'preset' | 'search'>('preset')
+
+  // Escape でモーダルを閉じる
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', handleEsc)
+    return () => document.removeEventListener('keydown', handleEsc)
+  }, [onClose])
 
   const resolveAndAdd = useCallback(
     async (name: string, lat: number, lon: number, admin1?: string) => {
@@ -129,8 +139,12 @@ export function LocationSearch({ onAdd, onClose }: LocationSearchProps) {
 
   /* ── GPS ── */
   const handleGPS = useCallback(async () => {
-    if (!navigator.geolocation) return
+    if (!navigator.geolocation) {
+      setGpsError('このブラウザは位置情報に対応していません')
+      return
+    }
     setGpsLoading(true)
+    setGpsError('')
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         const { latitude, longitude } = pos.coords
@@ -158,21 +172,26 @@ export function LocationSearch({ onAdd, onClose }: LocationSearchProps) {
       },
       () => {
         setGpsLoading(false)
-        alert('位置情報の取得に失敗しました。ブラウザの位置情報許可を確認してください。')
+        setGpsError('位置情報を取得できませんでした。ブラウザの位置情報の許可設定を確認してください。')
       },
       { enableHighAccuracy: true, timeout: 10000 }
     )
   }, [resolveAndAdd])
 
   const inputCls =
-    'flex-1 px-3 py-2 rounded-md border border-line bg-surface-sunk text-ink text-sm placeholder:text-ink-subtle focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent'
+    'flex-1 px-3 py-2 rounded-md border border-line-strong bg-surface-sunk text-ink text-sm placeholder:text-ink-subtle focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent'
   const primaryBtn =
-    'px-4 py-2 bg-accent text-accent-ink rounded-md text-sm font-semibold hover:bg-accent-strong disabled:opacity-50 transition-colors duration-200 ease-out'
+    'px-4 py-2 bg-accent text-accent-ink rounded-md text-sm font-semibold hover:bg-accent-hover disabled:opacity-50 transition-colors duration-200 ease-out'
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-16 px-4">
       <div className="absolute inset-0 bg-ink/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-md bg-surface-raised rounded-xl shadow-lg p-5 max-h-[80vh] overflow-y-auto">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="地点を追加"
+        className="relative w-full max-w-md bg-surface-raised rounded-xl shadow-lg p-5 max-h-[80vh] overflow-y-auto"
+      >
         <h2 className="font-display text-lg font-bold text-ink mb-3">地点を追加</h2>
 
         {/* GPS Button */}
@@ -183,6 +202,9 @@ export function LocationSearch({ onAdd, onClose }: LocationSearchProps) {
         >
           {gpsLoading ? '取得中...' : <><PinIcon size={16} /> 現在地から追加</>}
         </button>
+        {gpsError && (
+          <p className="text-xs text-danger -mt-2 mb-3" role="alert">{gpsError}</p>
+        )}
 
         {/* Postal code search */}
         <div className="mb-3 p-3 rounded-md bg-surface-sunk">

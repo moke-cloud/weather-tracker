@@ -22,13 +22,15 @@ const GEOCODING_URL = 'https://geocoding-api.open-meteo.com/v1/search'
  * - GFS: 米NOAA (降水確率の主要ソース)
  * - GEM: カナダ環境省
  */
+/* color は CSS 変数参照 (index.css で light/dark 別に定義)。
+   light の白地では 500 系が 3:1 を割るため、テーマごとに濃度を変える */
 export const MODELS = [
-  { id: 'jma_seamless', label: 'JMA', color: '#3b82f6' },
-  { id: 'ecmwf_ifs025', label: 'ECMWF', color: '#10b981' },
-  { id: 'icon_seamless', label: 'ICON', color: '#a855f7' },
-  { id: 'ukmo_seamless', label: 'UKMO', color: '#ec4899' },
-  { id: 'gfs_seamless', label: 'GFS', color: '#f59e0b' },
-  { id: 'gem_seamless', label: 'GEM', color: '#14b8a6' },
+  { id: 'jma_seamless', label: 'JMA', color: 'var(--chart-jma)' },
+  { id: 'ecmwf_ifs025', label: 'ECMWF', color: 'var(--chart-ecmwf)' },
+  { id: 'icon_seamless', label: 'ICON', color: 'var(--chart-icon)' },
+  { id: 'ukmo_seamless', label: 'UKMO', color: 'var(--chart-ukmo)' },
+  { id: 'gfs_seamless', label: 'GFS', color: 'var(--chart-gfs)' },
+  { id: 'gem_seamless', label: 'GEM', color: 'var(--chart-gem)' },
 ] as const
 
 const HOURLY_PARAMS = [

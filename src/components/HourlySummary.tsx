@@ -115,8 +115,8 @@ export function HourlySummary({ models, consensus, now }: HourlySummaryProps) {
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-[10px] text-ink-subtle">
         <span className="inline-flex items-center gap-1">
           <ThermometerIcon size={13} className="text-ink-subtle" /> 気温 (℃)
-          <span className="opacity-75">/ カッコ内は</span>
-          <span className="opacity-75">体感温度</span>
+          <span>/ カッコ内は</span>
+          <span>体感温度</span>
           <InfoTooltip term="apparentTemperature" />
         </span>
         <span className="inline-flex items-center gap-1">

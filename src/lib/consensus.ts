@@ -15,7 +15,8 @@
 import type { ModelForecast, HourlyPoint, AmedasObservation } from './types'
 
 export const CONSENSUS_LABEL = 'コンセンサス'
-export const CONSENSUS_COLOR = '#6366f1'
+/* CSS 変数参照 (index.css で light/dark 別に定義)。light 白地は #6366f1 だと 4.5:1 未満 */
+export const CONSENSUS_COLOR = 'var(--chart-consensus)'
 
 /** 短期 (0-48h) の既定重み: 日本域は高解像度領域モデルJMA MSMを最重視 */
 const SHORT_WEIGHTS: Record<string, number> = {

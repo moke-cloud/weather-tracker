@@ -41,31 +41,31 @@ const LEVEL_STYLES: Record<
 > = {
   safe: {
     bg: 'bg-surface',
-    badge: 'bg-safe text-white',
+    badge: 'bg-safe text-on-safe',
     ring: '',
     icon: '✅',
   },
   low: {
     bg: 'bg-low-soft',
-    badge: 'bg-low text-white',
+    badge: 'bg-low text-on-low',
     ring: '',
     icon: '\u{1F7E2}',
   },
   moderate: {
     bg: 'bg-caution-soft',
-    badge: 'bg-caution text-[oklch(0.28_0.04_85)]',
+    badge: 'bg-caution text-on-caution',
     ring: 'ring-1 ring-caution/40',
     icon: '\u{1F7E1}',
   },
   high: {
     bg: 'bg-warn-soft',
-    badge: 'bg-warn text-white',
+    badge: 'bg-warn text-on-warn',
     ring: 'ring-1 ring-warn/45',
     icon: '\u{1F7E0}',
   },
   critical: {
     bg: 'bg-danger-soft',
-    badge: 'bg-danger text-white',
+    badge: 'bg-danger text-on-danger',
     ring: 'ring-2 ring-danger/45',
     icon: '\u{1F534}',
   },
@@ -414,10 +414,24 @@ function FactorDetail({ factors }: { factors: HeadacheFactor[] }) {
 /* ── Score definition modal ── */
 
 function ScoreDefinitionModal({ onClose }: { onClose: () => void }) {
+  // Escape でモーダルを閉じる
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', handleEsc)
+    return () => document.removeEventListener('keydown', handleEsc)
+  }, [onClose])
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
       <div className="absolute inset-0 bg-ink/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-md max-h-[85vh] overflow-y-auto bg-surface-raised rounded-xl shadow-lg p-5">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="頭痛リスクスコアとは"
+        className="relative w-full max-w-md max-h-[85vh] overflow-y-auto bg-surface-raised rounded-xl shadow-lg p-5"
+      >
         <div className="flex items-center justify-between mb-3">
           <h2 className="font-display text-lg font-bold text-ink">頭痛リスクスコアとは</h2>
           <button
@@ -483,7 +497,7 @@ function ScoreDefinitionModal({ onClose }: { onClose: () => void }) {
 
         <button
           onClick={onClose}
-          className="mt-4 w-full py-2 rounded-md bg-accent text-accent-ink text-sm font-semibold hover:bg-accent-strong transition-colors duration-200 ease-out"
+          className="mt-4 w-full py-2 rounded-md bg-accent text-accent-ink text-sm font-semibold hover:bg-accent-hover transition-colors duration-200 ease-out"
         >
           閉じる
         </button>

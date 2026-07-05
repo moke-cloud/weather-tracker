@@ -40,6 +40,22 @@
   --color-warn-soft: var(--warn-soft);
   --color-danger-soft: var(--danger-soft);
 
+  /* 機能色のテキスト用 (面用と分離。accent/-strong と同じ2段構え)
+     面用の safe/caution/warn は白地でテキストAA (4.5:1) を満たさないため、
+     文字に使うときは必ずこちらを使う */
+  --color-safe-text: var(--safe-text);
+  --color-caution-text: var(--caution-text);
+  --color-warn-text: var(--warn-text);
+
+  /* 機能色の面の上に置く文字色 (バッジ等)。全ペア 4.5:1 以上を実測済み */
+  --color-on-safe: var(--on-safe);
+  --color-on-low: var(--on-low);
+  --color-on-caution: var(--on-caution);
+  --color-on-warn: var(--on-warn);
+  --color-on-danger: var(--on-danger);
+
+  --color-accent-hover: var(--accent-hover);
+
   /* 気温・降水の慣用色 (暖=最高気温, 寒=最低気温/降水)。情報を運ぶ色 */
   --color-hot: var(--hot);
   --color-cool: var(--cool);
@@ -65,6 +81,10 @@
 
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+
+  /* 空バンド (WeatherCard) 専用インク。空グラデはシーン色 (テーマ非依存の絶対値)
+     なので、その上の文字もテーマで反転しない静的トークンを使う */
+  --color-sky-ink: oklch(0.27 0.025 255);
 }
 
 /* ── Light: 昼の大気 (寒色オフホワイト + 蜂蜜色アクセント) ── */
@@ -82,24 +102,46 @@
   --line-strong: oklch(0.85 0.015 245);
 
   --accent: oklch(0.74 0.135 72);        /* honey / sunrise (面・塗り用) */
-  --accent-strong: oklch(0.56 0.13 58);  /* 文字/アイコン用に濃いめ (白地で可読) */
+  --accent-strong: oklch(0.53 0.13 58);  /* 文字/アイコン用に濃いめ (accent-soft 上でも 4.6:1) */
   --accent-soft: oklch(0.94 0.045 78);
   --accent-ink: oklch(0.30 0.06 60);     /* アクセント面の上の文字 (暖色ダーク) */
+  --accent-hover: oklch(0.70 0.14 70);   /* accent ボタンの hover 面 (accent-ink が 5.0:1 を維持) */
 
   --safe: oklch(0.70 0.135 152);
   --low: oklch(0.74 0.13 158);
   --caution: oklch(0.78 0.135 88);
   --warn: oklch(0.70 0.155 52);
-  --danger: oklch(0.60 0.195 26);
+  --danger: oklch(0.53 0.19 26);   /* 文字利用が多いため白地4.5:1以上 (5.8:1)。danger-soft 上でも 4.9:1 */
   --safe-soft: oklch(0.95 0.035 152);
   --low-soft: oklch(0.95 0.04 158);
   --caution-soft: oklch(0.95 0.05 90);
   --warn-soft: oklch(0.95 0.045 60);
   --danger-soft: oklch(0.95 0.035 22);
 
-  --hot: oklch(0.55 0.17 30);   /* 文字利用が多いので白地で可読に */
+  /* 機能色テキスト版: 白地/タイル地で 4.5:1 以上 (実測 5.3-5.9) */
+  --safe-text: oklch(0.47 0.11 152);
+  --caution-text: oklch(0.50 0.10 88);
+  --warn-text: oklch(0.50 0.13 52);
+
+  /* 機能色面の上の文字。黄系は暗インク、danger のみ白 (面が濃いため) */
+  --on-safe: oklch(0.25 0.05 152);
+  --on-low: oklch(0.25 0.05 158);
+  --on-caution: oklch(0.28 0.04 85);
+  --on-warn: oklch(0.25 0.05 52);
+  --on-danger: white;
+
+  --hot: oklch(0.53 0.17 30);   /* 文字利用が多いので白地で可読に (accent-soft 上でも 4.8:1) */
   --cool: oklch(0.52 0.13 245);
   --cool-soft: oklch(0.94 0.04 240);
+
+  /* チャート系列色 (Recharts に var() で渡す)。light は白地 3:1 以上 (線幅1px+透過0.75でも視認可) */
+  --chart-jma: #2563eb;
+  --chart-ecmwf: #047857;
+  --chart-icon: #9333ea;
+  --chart-ukmo: #db2777;
+  --chart-gfs: #b45309;
+  --chart-gem: #0f766e;
+  --chart-consensus: #4f46e5;
 }
 
 /* ── Dark: 薄明の大気 (twilight blue) ── */
@@ -118,8 +160,9 @@
 
   --accent: oklch(0.78 0.135 74);
   --accent-strong: oklch(0.72 0.14 68);
-  --accent-soft: oklch(0.34 0.06 70);
+  --accent-soft: oklch(0.31 0.055 70);   /* 上に乗る ink-subtle/hot が 4.5:1 を満たす暗さ */
   --accent-ink: oklch(0.22 0.04 60);
+  --accent-hover: oklch(0.82 0.13 76);   /* dark では hover で明るく (accent-ink 9.8:1) */
 
   --safe: oklch(0.74 0.13 152);
   --low: oklch(0.76 0.125 158);
@@ -130,11 +173,32 @@
   --low-soft: oklch(0.33 0.05 158);
   --caution-soft: oklch(0.35 0.06 90);
   --warn-soft: oklch(0.34 0.07 52);
-  --danger-soft: oklch(0.33 0.08 24);
+  --danger-soft: oklch(0.29 0.075 24);   /* danger 文字が 4.65:1 を満たす暗さ */
 
-  --hot: oklch(0.68 0.17 30);
+  /* dark では面用の機能色がそのまま暗地でテキストAAを満たす */
+  --safe-text: var(--safe);
+  --caution-text: var(--caution);
+  --warn-text: var(--warn);
+
+  /* dark は面が明るいので全レベル暗インク (danger 含む: 白は 3.1:1 で不可) */
+  --on-safe: oklch(0.25 0.05 152);
+  --on-low: oklch(0.25 0.05 158);
+  --on-caution: oklch(0.28 0.04 85);
+  --on-warn: oklch(0.25 0.05 52);
+  --on-danger: oklch(0.25 0.06 26);
+
+  --hot: oklch(0.71 0.16 30);   /* accent-soft 上でも 4.8:1 */
   --cool: oklch(0.70 0.12 242);
   --cool-soft: oklch(0.33 0.05 245);
+
+  /* チャート系列色: 暗地では明るい 400-500 系が 3:1 以上 */
+  --chart-jma: #3b82f6;
+  --chart-ecmwf: #10b981;
+  --chart-icon: #a855f7;
+  --chart-ukmo: #ec4899;
+  --chart-gfs: #f59e0b;
+  --chart-gem: #14b8a6;
+  --chart-consensus: #818cf8;
 }
 
 :root {

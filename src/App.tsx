@@ -60,9 +60,15 @@ function App() {
   useEffect(() => {
     document.documentElement.classList.toggle('dark', darkMode)
     localStorage.setItem('theme', darkMode ? 'dark' : 'light')
+    // テーマは OS 設定でなくアプリのトグルで決まるため、theme-color も追従させる
+    // (値は index.css の --canvas と一致させる)
+    const themeColor = darkMode ? '#101723' : '#f0f8fe'
+    document.querySelectorAll('meta[name="theme-color"]').forEach(m => {
+      m.setAttribute('content', themeColor)
+    })
   }, [darkMode])
 
-  // Close menu on outside click
+  // Close menu on outside click / Escape
   useEffect(() => {
     if (!showMenu) return
     const handler = (e: MouseEvent) => {
@@ -70,8 +76,15 @@ function App() {
         setShowMenu(false)
       }
     }
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setShowMenu(false)
+    }
     document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
+    document.addEventListener('keydown', handleEsc)
+    return () => {
+      document.removeEventListener('mousedown', handler)
+      document.removeEventListener('keydown', handleEsc)
+    }
   }, [showMenu])
 
   // PWA install prompt
@@ -144,6 +157,7 @@ function App() {
               onClick={() => setShowSearch(true)}
               className="p-2 rounded-md text-accent-strong hover:bg-accent-soft transition-colors duration-200 ease-out"
               title="地点追加"
+              aria-label="地点を追加"
             >
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                 <circle cx="10" cy="10" r="8" />
@@ -158,6 +172,9 @@ function App() {
                 onClick={() => setShowMenu(v => !v)}
                 className="p-2 rounded-md text-ink-subtle hover:bg-surface-sunk hover:text-ink transition-colors duration-200 ease-out"
                 title="メニュー"
+                aria-label="メニュー"
+                aria-haspopup="menu"
+                aria-expanded={showMenu}
               >
                 <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
                   <circle cx="10" cy="4" r="1.5" />
@@ -270,10 +287,24 @@ function MenuItem({
 function InstallGuide({ onClose }: { onClose: () => void }) {
   const platform = detectPlatform()
 
+  // Escape でモーダルを閉じる
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', handleEsc)
+    return () => document.removeEventListener('keydown', handleEsc)
+  }, [onClose])
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
       <div className="absolute inset-0 bg-ink/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-sm bg-surface-raised rounded-xl shadow-lg p-5">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="アプリをインストール"
+        className="relative w-full max-w-sm bg-surface-raised rounded-xl shadow-lg p-5"
+      >
         <h2 className="font-display text-lg font-bold mb-3">アプリをインストール</h2>
 
         {platform === 'ios' && (

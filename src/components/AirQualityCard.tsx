@@ -29,9 +29,9 @@ export function AirQualityCard({ data }: AirQualityCardProps) {
     pm25 === null
       ? null
       : pm25 <= 15
-        ? { label: 'WHO基準クリア', color: 'text-safe' }
+        ? { label: 'WHO基準クリア', color: 'text-safe-text' }
         : pm25 <= 35
-          ? { label: 'WHO超/日本基準内', color: 'text-caution' }
+          ? { label: 'WHO超/日本基準内', color: 'text-caution-text' }
           : { label: '日本環境省注意値超', color: 'text-danger' }
 
   return (

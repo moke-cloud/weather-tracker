@@ -110,7 +110,7 @@ export function HeadacheDiary() {
           <span className="nums ml-auto inline-flex items-center gap-1">
             {storageInfo.persisted
               ? <LockIcon size={11} className="text-ink-subtle" />
-              : <AlertIcon size={11} className="text-warn" />}
+              : <AlertIcon size={11} className="text-warn-text" />}
             {storageInfo.used} / {storageInfo.quota}
             {!storageInfo.persisted && ' (永続化未許可)'}
           </span>

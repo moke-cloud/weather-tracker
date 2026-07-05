@@ -110,10 +110,10 @@ export function PressureChart({ models, consensus, ensemble, amedas }: PressureC
 
   const rateBadge =
     Math.abs(changeRate ?? 0) > 2
-      ? 'bg-danger text-white'
+      ? 'bg-danger text-on-danger'
       : Math.abs(changeRate ?? 0) > 1
-        ? 'bg-caution text-[oklch(0.28_0.04_85)]'
-        : 'bg-safe text-white'
+        ? 'bg-caution text-on-caution'
+        : 'bg-safe text-on-safe'
 
   return (
     <div className="p-4">

@@ -40,11 +40,12 @@ export function WeatherCard({ amedas, models }: WeatherCardProps) {
   // 今の空 (天気 × 時間帯) を背景グラデーションに反映
   const sky = currentSky(wCode, now)
   const onDark = sky.textOn === 'dark'
-  const skyText = onDark ? 'text-white' : 'text-ink'
-  const skyMuted = onDark ? 'text-white/75' : 'text-ink-muted'
+  // 空バンドはシーン色 (テーマ非依存) なので、文字もテーマで反転しない sky-ink / white を使う
+  const skyText = onDark ? 'text-white' : 'text-sky-ink'
+  const skyMuted = onDark ? 'text-white/90' : 'text-sky-ink/85'
   const badge = onDark
-    ? 'bg-white/20 text-white ring-1 ring-white/25'
-    : 'bg-ink/8 text-ink ring-1 ring-ink/10'
+    ? 'bg-sky-ink/30 text-white ring-1 ring-white/25'
+    : 'bg-sky-ink/8 text-sky-ink ring-1 ring-sky-ink/10'
 
   return (
     <div className="rounded-lg bg-surface shadow-md overflow-hidden">
@@ -54,7 +55,7 @@ export function WeatherCard({ amedas, models }: WeatherCardProps) {
           <h3 className={`text-xs font-medium tracking-wide ${skyMuted}`}>現在の天気</h3>
           <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full ${badge}`}>
             {source}
-            <InfoTooltip term={sourceTerm} className={onDark ? 'text-white/80' : 'text-ink-muted'} />
+            <InfoTooltip term={sourceTerm} className={onDark ? 'text-white/90' : 'text-sky-ink'} />
           </span>
         </div>
 
@@ -63,7 +64,7 @@ export function WeatherCard({ amedas, models }: WeatherCardProps) {
             code={wCode}
             date={now}
             size={60}
-            className={onDark ? 'text-white/90 drop-shadow-sm' : 'text-ink-muted drop-shadow-sm'}
+            className={onDark ? 'text-white/90 drop-shadow-sm' : 'text-sky-ink/85 drop-shadow-sm'}
           />
           <div className="min-w-0">
             <div className={`font-display nums text-4xl font-bold leading-none ${skyText}`}>
@@ -74,7 +75,7 @@ export function WeatherCard({ amedas, models }: WeatherCardProps) {
               <div className={`inline-flex items-center gap-1 mt-1 text-xs ${skyMuted}`}>
                 <span className="nums">体感 {apparentTemp.toFixed(1)}{'°'}C</span>
                 <span className="text-[10px] opacity-80">({apparentSource})</span>
-                <InfoTooltip term="apparentTemperature" className={onDark ? 'text-white/80' : 'text-ink-muted'} />
+                <InfoTooltip term="apparentTemperature" className={onDark ? 'text-white/90' : 'text-sky-ink'} />
               </div>
             )}
             <div className={`text-sm mt-0.5 ${skyText}`}>{weatherLabel(wCode)}</div>
