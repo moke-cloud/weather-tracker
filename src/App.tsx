@@ -145,7 +145,7 @@ function App() {
       />
 
       {/* Header */}
-      <header className="sticky top-0 z-40 backdrop-blur-md bg-canvas/75 border-b border-line">
+      <header className="sticky top-0 z-40 backdrop-blur-md bg-canvas/75 border-b border-line pt-[env(safe-area-inset-top)]">
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
           <h1 className="font-display text-xl font-bold flex items-center gap-2">
             <WeatherIcon code={2} size={24} className="text-ink-muted" />
@@ -223,8 +223,12 @@ function App() {
         <Dashboard locations={locations} onRemoveLocation={handleRemoveLocation} />
       </main>
 
-      {/* Footer */}
-      <footer className="relative z-10 max-w-4xl mx-auto px-4 py-6 text-xs text-ink-subtle text-center border-t border-line">
+      {/* Footer (地点があるときはモバイルで下部ナビ分の余白を空ける) */}
+      <footer
+        className={`relative z-10 max-w-4xl mx-auto px-4 py-6 text-xs text-ink-subtle text-center border-t border-line ${
+          locations.length > 0 ? 'mb-[calc(4rem+env(safe-area-inset-bottom))] md:mb-0' : ''
+        }`}
+      >
         <p>
           データソース: JMA AMeDAS / Open-Meteo 6モデル (JMA MSM, ECMWF, ICON, UKMO, GFS, GEM) + 82メンバーアンサンブル
         </p>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import {
   DndContext,
   closestCenter,
@@ -32,6 +32,7 @@ import { PressureChart } from './PressureChart'
 import { ForecastTable } from './ForecastTable'
 import { UmbrellaTimeline } from './UmbrellaTimeline'
 import { RainNowcast } from './RainNowcast'
+import { BottomNav } from './BottomNav'
 import { InfoTooltip } from './InfoTooltip'
 import type { GlossaryKey } from '../lib/glossary'
 
@@ -47,6 +48,15 @@ const MODEL_TERM: Record<string, GlossaryKey> = {
 
 const AUTO_REFRESH_MS = 10 * 60_000 // 10 minutes
 
+// BottomNav からのジャンプ時に展開する折りたたみセクションのキー接頭辞
+// (toggleSection のキー `${prefix}_${locId}` と一致させる)
+const SECTION_KEY_PREFIX: Partial<Record<TileId, string>> = {
+  pressure: 'pressure',
+  airquality: 'aqi',
+  models: 'models',
+  diary: 'diary',
+}
+
 interface DashboardProps {
   locations: Location[]
   onRemoveLocation: (id: string) => void
@@ -58,6 +68,7 @@ export function Dashboard({ locations, onRemoveLocation }: DashboardProps) {
   const [errors, setErrors] = useState<Map<string, string>>(new Map())
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set())
   const [editMode, setEditMode] = useState(false)
+  const [dragging, setDragging] = useState(false)
   const [nextRefreshIn, setNextRefreshIn] = useState(AUTO_REFRESH_MS)
   const { order, reorder, resetOrder } = useTileOrder()
   const refreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -73,6 +84,21 @@ export function Dashboard({ locations, onRemoveLocation }: DashboardProps) {
       const next = new Set(prev)
       if (next.has(key)) next.delete(key)
       else next.add(key)
+      return next
+    })
+  }, [])
+
+  const locationIds = useMemo(() => locations.map(l => l.id), [locations])
+
+  // BottomNav ジャンプ前: 対象が折りたたみセクションなら展開しておく
+  const ensureExpanded = useCallback((tile: TileId, locId: string) => {
+    const prefix = SECTION_KEY_PREFIX[tile]
+    if (!prefix) return
+    setExpandedSections(prev => {
+      const key = `${prefix}_${locId}`
+      if (prev.has(key)) return prev
+      const next = new Set(prev)
+      next.add(key)
       return next
     })
   }, [])
@@ -171,6 +197,7 @@ export function Dashboard({ locations, onRemoveLocation }: DashboardProps) {
   }, [locations.length])
 
   function handleDragEnd(event: DragEndEvent) {
+    setDragging(false)
     const { active, over } = event
     if (!over || active.id === over.id) return
     const oldIndex = order.indexOf(active.id as TileId)
@@ -297,11 +324,17 @@ export function Dashboard({ locations, onRemoveLocation }: DashboardProps) {
             )}
 
             {data && (
-              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragStart={() => setDragging(true)}
+                onDragCancel={() => setDragging(false)}
+                onDragEnd={handleDragEnd}
+              >
                 <SortableContext items={order} strategy={verticalListSortingStrategy}>
                   <div className="space-y-3">
                     {order.map(tileId => (
-                      <SortableTile key={tileId} id={tileId} editMode={editMode}>
+                      <SortableTile key={tileId} id={tileId} locId={loc.id} editMode={editMode}>
                         <TileContent
                           tileId={tileId}
                           data={data}
@@ -318,6 +351,14 @@ export function Dashboard({ locations, onRemoveLocation }: DashboardProps) {
           </section>
         )
       })}
+
+      {/* モバイル用 下部セクションナビ */}
+      <BottomNav
+        order={order}
+        locationIds={locationIds}
+        suspendTracking={dragging}
+        onBeforeJump={ensureExpanded}
+      />
     </div>
   )
 }
@@ -326,10 +367,12 @@ export function Dashboard({ locations, onRemoveLocation }: DashboardProps) {
 
 function SortableTile({
   id,
+  locId,
   editMode,
   children,
 }: {
-  id: string
+  id: TileId
+  locId: string
   editMode: boolean
   children: React.ReactNode
 }) {
@@ -346,12 +389,21 @@ function SortableTile({
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    zIndex: isDragging ? 50 : undefined,
+    // 下部ナビ (z-40) より下、静的な兄弟タイルより上
+    zIndex: isDragging ? 30 : undefined,
     opacity: isDragging ? 0.85 : undefined,
   }
 
   return (
-    <div ref={setNodeRef} style={style}>
+    <div
+      ref={setNodeRef}
+      style={style}
+      id={`tile-${locId}-${id}`}
+      data-tile-anchor
+      data-tile={id}
+      data-loc={locId}
+      className="scroll-mt-[calc(4rem+env(safe-area-inset-top))]"
+    >
       {editMode && (
         <div
           ref={setActivatorNodeRef}
@@ -360,7 +412,7 @@ function SortableTile({
           className="flex items-center gap-2 px-3 py-1.5 mb-1 rounded-t-md bg-accent-soft text-accent-strong text-xs cursor-grab active:cursor-grabbing select-none touch-none"
         >
           <span className="text-base leading-none" aria-hidden>{'\u2807'}</span>
-          <span>{TILE_LABELS[id as TileId]}</span>
+          <span>{TILE_LABELS[id]}</span>
         </div>
       )}
       <div className={editMode ? 'ring-2 ring-accent/50 rounded-lg' : ''}>

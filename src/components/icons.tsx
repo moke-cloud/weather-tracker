@@ -124,6 +124,101 @@ export function AlertIcon(p: IconProps) {
   )
 }
 
+/* ── タイルナビ用アイコン (BottomNav / タイル見出し) ── */
+
+export function SunCloudIcon(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <path d="M12 2.5V4M4.9 4.9 6 6M20 11.5h1.5M19.1 4.9 18 6" />
+      <path d="M15.7 11.8a4 4 0 1 0-7.3-2.4" />
+      <path d="M13 21.5H7a4.5 4.5 0 1 1 .8-8.9A5 5 0 0 1 13 9.5a3 3 0 0 1 0 12Z" />
+    </Svg>
+  )
+}
+
+export function CloudRainIcon(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <path d="M4 13.9A7 7 0 1 1 15.7 7h1.8a4.5 4.5 0 0 1 2.5 8.2" />
+      <path d="M8 14v4M12 16v4M16 14v4" />
+    </Svg>
+  )
+}
+
+export function ZapIcon(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <path d="M13 2 3.5 14H10l-1 8L18.5 10H12l1-8Z" />
+    </Svg>
+  )
+}
+
+export function ClockIcon(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3.2 1.9" />
+    </Svg>
+  )
+}
+
+export function CalendarIcon(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <rect x="3.5" y="5" width="17" height="16" rx="2" />
+      <path d="M8 3v4M16 3v4M3.5 10.5h17" />
+    </Svg>
+  )
+}
+
+export function GaugeIcon(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <path d="m12 14 4-4" />
+      <path d="M3.3 19a10 10 0 1 1 17.4 0" />
+    </Svg>
+  )
+}
+
+export function WindIcon(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <path d="M12.8 5a2 2 0 1 1 1.4 3.4H2.5" />
+      <path d="M17.5 9.8a2.5 2.5 0 1 1 2 4.2H2.5" />
+      <path d="M9.8 21a2 2 0 1 0 1.4-3.4H2.5" />
+    </Svg>
+  )
+}
+
+export function LayersIcon(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <path d="m12 3 9 5-9 5-9-5 9-5Z" />
+      <path d="m3.5 13.5 8.5 4.7 8.5-4.7" />
+    </Svg>
+  )
+}
+
+export function BookIcon(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <path d="M4 5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5Z" />
+      <path d="M9 3v18" />
+    </Svg>
+  )
+}
+
+export function GridIcon(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <rect x="4" y="4" width="6.5" height="6.5" rx="1.5" />
+      <rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5" />
+      <rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5" />
+      <rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5" />
+    </Svg>
+  )
+}
+
 /** 状態ドット (リスクレベル・重症度などの色付き丸を絵文字でなくトークン色で) */
 export function StatusDot({ className = '', size = 10 }: { className?: string; size?: number }) {
   return (

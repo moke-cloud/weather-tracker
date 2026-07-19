@@ -5,7 +5,8 @@
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌤</text></svg>" />
     <link rel="manifest" href="manifest.json" />
     <link rel="apple-touch-icon" href="icon-192.png" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- viewport-fit=cover: iOS PWA で env(safe-area-inset-*) を有効にする (下部ナビ/ヘッダーが対応済み) -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <!-- --canvas (index.css) と同値。テーマ切替時は App.tsx が content を上書きする -->
     <meta name="theme-color" content="#f0f8fe" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#101723" media="(prefers-color-scheme: dark)" />
